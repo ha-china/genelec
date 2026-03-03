@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import ipaddress
 import json
 import logging
+import socket
+import re
 from typing import Any
 
 import aiohttp
@@ -39,6 +42,7 @@ from .const import (
     ENDPOINT_AUDIO_VOLUME,
     ENDPOINT_AOIP_DANTE_IDENTITY,
     ENDPOINT_AOIP_IPV4,
+    ENDPOINT_API_ROOT,
     ENDPOINT_DEVICE_ID,
     ENDPOINT_DEVICE_INFO,
     ENDPOINT_DEVICE_LED,
@@ -48,6 +52,9 @@ from .const import (
     ENDPOINT_NETWORK_ZONE,
     ENDPOINT_PROFILE_LIST,
     ENDPOINT_PROFILE_RESTORE,
+    INPUT_ANALOG_API,
+    INPUT_AOIP_01_API,
+    INPUT_AOIP_02_API,
     LOGGER,
     MAX_VOLUME_DB,
     MIN_VOLUME_DB,
@@ -60,6 +67,8 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_HOSTNAME_RE = re.compile(r"^[A-Za-z0-9-]{1,63}$")
+_VALID_INPUTS = {INPUT_ANALOG_API, INPUT_AOIP_01_API, INPUT_AOIP_02_API}
 
 
 class GenelecSmartIPDevice:
@@ -97,7 +106,11 @@ class GenelecSmartIPDevice:
         return f"Basic {encoded}"
 
     async def _request(
-        self, method: str, endpoint: str, data: dict[str, Any] | None = None
+        self,
+        method: str,
+        endpoint: str,
+        data: dict[str, Any] | None = None,
+        quiet_statuses: set[int] | None = None,
     ) -> dict[str, Any]:
         """Make a request to the device API."""
         url = f"{self._base_url}{endpoint}"
@@ -150,7 +163,10 @@ class GenelecSmartIPDevice:
 
                     if response.status != 200:
                         error_text = await response.text()
-                        _LOGGER.error("Request failed %d: %s", response.status, error_text)
+                        if quiet_statuses and response.status in quiet_statuses:
+                            _LOGGER.debug("Request returned %d for %s", response.status, endpoint)
+                        else:
+                            _LOGGER.error("Request failed %d: %s", response.status, error_text)
                         raise ClientResponseError(
                             response.request_info,
                             response.history,
@@ -169,6 +185,10 @@ class GenelecSmartIPDevice:
         data = await self._request("GET", ENDPOINT_DEVICE_INFO)
         self._device_info = data
         return data
+
+    async def get_api_root(self) -> dict[str, Any]:
+        """Get API root payload from /public/{version}/."""
+        return await self._request("GET", ENDPOINT_API_ROOT, quiet_statuses={404})
 
     async def get_device_id(self) -> dict[str, Any]:
         """Get device ID information."""
@@ -218,11 +238,16 @@ class GenelecSmartIPDevice:
 
     async def get_inputs(self) -> dict[str, Any]:
         """Get selected audio inputs."""
-        return await self._request("GET", ENDPOINT_AUDIO_INPUTS)
+        return await self._request("GET", ENDPOINT_AUDIO_INPUTS, quiet_statuses={404})
 
     async def set_inputs(self, inputs: list[str]) -> dict[str, Any]:
         """Set audio inputs."""
-        return await self._request("PUT", ENDPOINT_AUDIO_INPUTS, {"input": inputs})
+        sanitized = [str(item) for item in inputs]
+        if any(item not in _VALID_INPUTS for item in sanitized):
+            raise ValueError("inputs must be any of: A, AoIP01, AoIP02")
+        return await self._request(
+            "PUT", ENDPOINT_AUDIO_INPUTS, {"input": sanitized}, quiet_statuses={404}
+        )
 
     async def get_led_settings(self) -> dict[str, Any]:
         """Get LED settings."""
@@ -273,6 +298,77 @@ class GenelecSmartIPDevice:
     async def get_network_config(self) -> dict[str, Any]:
         """Get network configuration."""
         return await self._request("GET", ENDPOINT_NETWORK_IPV4)
+
+    async def set_network_config(
+        self,
+        *,
+        hostname: str | None = None,
+        mode: str | None = None,
+        ip: str | None = None,
+        mask: str | None = None,
+        gw: str | None = None,
+        vol_ip: str | None = None,
+        vol_port: int | None = None,
+        auth: str | None = None,
+    ) -> dict[str, Any]:
+        """Set network configuration via /network/ipv4."""
+        payload: dict[str, Any] = {}
+
+        if hostname is not None:
+            hostname_value = str(hostname)
+            if not _HOSTNAME_RE.match(hostname_value):
+                raise ValueError("hostname must be 1-63 chars using A-Z, a-z, 0-9 or '-' only")
+            payload["hostname"] = hostname_value
+        if mode is not None:
+            mode_value = str(mode).lower()
+            if mode_value not in {"auto", "static"}:
+                raise ValueError("mode must be 'auto' or 'static'")
+            payload["mode"] = mode_value
+        if ip is not None:
+            ip_value = str(ip)
+            ipaddress.ip_address(ip_value)
+            payload["ip"] = ip_value
+        if mask is not None:
+            mask_value = str(mask)
+            ipaddress.ip_address(mask_value)
+            payload["mask"] = mask_value
+        if gw is not None:
+            gw_value = str(gw)
+            ipaddress.ip_address(gw_value)
+            payload["gw"] = gw_value
+        if vol_ip is not None:
+            vol_ip_value = str(vol_ip)
+            ipaddress.ip_address(vol_ip_value)
+            payload["volIp"] = vol_ip_value
+        if vol_port is not None:
+            port_value = int(vol_port)
+            if port_value < 1024 or port_value > 65535:
+                raise ValueError("vol_port must be in range 1024..65535")
+            payload["volPort"] = port_value
+        if auth is not None:
+            auth_value = str(auth)
+            if len(auth_value) > 64:
+                raise ValueError("auth must be at most 64 characters")
+            payload["auth"] = auth_value
+
+        if not payload:
+            return {}
+
+        return await self._request("PUT", ENDPOINT_NETWORK_IPV4, payload)
+
+    async def send_multicast(self, payload: dict[str, Any], ip: str, port: int) -> None:
+        """Send one multicast control message."""
+        message = json.dumps({"mcast": {"ver": 1, **payload}}).encode("utf-8")
+
+        def _send() -> None:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+            try:
+                sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
+                sock.sendto(message, (ip, int(port)))
+            finally:
+                sock.close()
+
+        await asyncio.to_thread(_send)
 
     async def get_aoip_identity(self) -> dict[str, Any]:
         """Get AoIP Dante identity."""

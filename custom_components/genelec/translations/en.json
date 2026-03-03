@@ -51,10 +51,19 @@
       "mac_address": {"name": "MAC Address"},
       "barcode": {"name": "Barcode"},
       "hardware_id": {"name": "Hardware ID"},
+      "model_config": {"name": "Model Config"},
+      "build": {"name": "Build"},
+      "base_id": {"name": "Base ID"},
+      "technology": {"name": "Technology"},
+      "upgrade_id": {"name": "Upgrade ID"},
+      "confirm_fw_update": {"name": "Confirm Firmware Update"},
       "host_ip": {"name": "Host IP"},
       "receiver_ip": {"name": "Receiver IP"},
       "dante_name": {"name": "Dante Name"},
       "dante_friendly_name": {"name": "Dante Friendly Name"},
+      "dante_locked": {"name": "Dante Locked"},
+      "poe_allocated_power": {"name": "PoE Allocated Power"},
+      "poe_pd_15w": {"name": "PoE PD 15W"},
       "hostname": {"name": "Hostname"},
       "zone_name": {"name": "Zone Name"},
       "zone_id": {"name": "Zone ID"},
@@ -64,6 +73,9 @@
     "select": {
       "profile": {
         "name": "Profile"
+      },
+      "zone_profile": {
+        "name": "Zone Profile"
       },
       "power_state": {
         "name": "Power State",
@@ -89,25 +101,42 @@
       "mute": {"name": "Mute"},
       "rj45_leds": {"name": "RJ45 LEDs"},
       "clip_led": {"name": "Clip LED"}
+    },
+    "number": {
+      "led_intensity": {"name": "LED Intensity"}
     }
   },
   "services": {
     "wake_up": {
       "name": "Wake Up",
-      "description": "Wake up the device from standby."
+      "description": "Wake up the device from standby.",
+      "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."}
+      }
     },
     "set_standby": {
       "name": "Set Standby",
-      "description": "Put the device in standby mode."
+      "description": "Put the device in standby mode.",
+      "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."}
+      }
     },
     "boot_device": {
       "name": "Boot Device",
-      "description": "Boot the device from off state."
+      "description": "Send BOOT power state to the device.",
+      "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."}
+      }
     },
     "set_volume_level": {
       "name": "Set Volume Level",
       "description": "Set the volume level.",
       "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."},
         "level": {
           "name": "Level",
           "description": "Volume level in dB (-200 to 0)."
@@ -118,6 +147,8 @@
       "name": "Set LED Intensity",
       "description": "Set the LED intensity.",
       "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."},
         "intensity": {
           "name": "Intensity",
           "description": "LED intensity (0-100)."
@@ -128,6 +159,8 @@
       "name": "Restore Profile",
       "description": "Restore a saved profile.",
       "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."},
         "profile_id": {
           "name": "Profile ID",
           "description": "ID of the profile to restore."
@@ -136,6 +169,66 @@
           "name": "Startup",
           "description": "Set as startup profile."
         }
+      }
+    },
+    "set_network_ipv4": {
+      "name": "Set Network IPv4",
+      "description": "Write network IPv4 settings.",
+      "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."},
+        "hostname": {"name": "Hostname", "description": "Device hostname."},
+        "mode": {"name": "Mode", "description": "Network mode: auto or static."},
+        "ip": {"name": "IP Address", "description": "IPv4 address, required in static mode."},
+        "mask": {"name": "Netmask", "description": "IPv4 netmask, required in static mode."},
+        "gw": {"name": "Gateway", "description": "Gateway, required in static mode."},
+        "vol_ip": {"name": "Multicast IP", "description": "Multicast group IP (0.0.0.0 disables multicast)."},
+        "vol_port": {"name": "Multicast Port", "description": "Multicast port (1024-65535)."},
+        "auth": {"name": "Auth", "description": "Credentials in user:password format."}
+      }
+    },
+    "multicast_set_volume": {
+      "name": "Multicast Set Volume",
+      "description": "Send multicast volume command.",
+      "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."},
+        "level": {"name": "Level", "description": "Multicast volume in dB (-130 to 0)."}
+      }
+    },
+    "multicast_set_mute": {
+      "name": "Multicast Set Mute",
+      "description": "Send multicast mute command.",
+      "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."},
+        "mute": {"name": "Mute", "description": "True to mute, false to unmute."}
+      }
+    },
+    "multicast_set_profile": {
+      "name": "Multicast Set Profile",
+      "description": "Send multicast profile command.",
+      "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."},
+        "profile_id": {"name": "Profile ID", "description": "Multicast profile id (0-5)."}
+      }
+    },
+    "multicast_power": {
+      "name": "Multicast Power",
+      "description": "Send multicast power command.",
+      "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."},
+        "state": {"name": "State", "description": "STANDBY or BOOT."}
+      }
+    },
+    "get_api_root": {
+      "name": "Get API Root",
+      "description": "Query API root payload from /public/<version>/.",
+      "fields": {
+        "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
+        "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."}
       }
     }
   }

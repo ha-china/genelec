@@ -1,6 +1,7 @@
 """Select platform for Genelec Smart IP integration."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, TYPE_CHECKING
 
@@ -69,6 +70,21 @@ async def async_setup_entry(
         GenelecPowerStateSelect(device, device_info, coordinator),
         GenelecProfileSelect(device, device_info, coordinator),
     ]
+
+    zone_info = data.zone_info if data else {}
+    if (not zone_info) and coordinator and coordinator.data:
+        zone_info = coordinator.data.get("zone_info", {}) or {}
+    try:
+        zone_id = int(zone_info.get("zone")) if zone_info.get("zone") is not None else None
+    except (TypeError, ValueError):
+        zone_id = None
+    if zone_id is not None and zone_id > 0:
+        zone_registry = hass.data[DOMAIN].setdefault("_zone_profile_entities", set())
+        zone_key = f"group_zone_{zone_id}"
+        if zone_key not in zone_registry:
+            zone_registry.add(zone_key)
+            zone_name = str(zone_info.get("name") or f"Zone {zone_id}")
+            entities.append(GenelecZoneProfileSelect(hass, zone_id, zone_name))
 
     async_add_entities(entities)
 
@@ -171,6 +187,11 @@ class GenelecPowerStateSelect(CoordinatorEntity, SelectEntity):
 def _build_profile_options(profile_data: dict[str, Any]) -> tuple[list[str], dict[str, int], dict[int, str]]:
     """Build profile option labels and maps from API payload."""
     profiles: dict[int, str] = {0: "Default"}
+
+    # Always expose all API-valid profile IDs so selection still works
+    # even when firmware returns an empty list payload.
+    for pid in range(1, 6):
+        profiles[pid] = f"Profile {pid}"
 
     for item in profile_data.get("list", []):
         pid = item.get("id")
@@ -286,4 +307,166 @@ class GenelecProfileSelect(CoordinatorEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the selected option."""
+        return self._current_option
+
+
+class GenelecZoneProfileSelect(SelectEntity):
+    """Select entity for zone-wide profile control."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_translation_key = "zone_profile"
+    _attr_icon = "mdi:playlist-play"
+
+    def __init__(self, hass: HomeAssistant, zone_id: int, zone_name: str) -> None:
+        self.hass = hass
+        self._zone_id = zone_id
+        self._zone_name = zone_name
+        self._attr_has_entity_name = True
+        self._attr_name = "Profile"
+        self._attr_unique_id = f"genelec_group_zone_{zone_id}_profile"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"group_zone_{zone_id}")},
+            "name": f"Genelec Zone {zone_name}",
+            "manufacturer": "Genelec",
+            "model": "Zone Group",
+        }
+        self._attr_options = ["Default (0)"]
+        self._option_to_id: dict[str, int] = {"Default (0)": 0}
+        self._id_to_option: dict[int, str] = {0: "Default (0)"}
+        self._current_option: str | None = "Default (0)"
+
+    def _zone_targets(self) -> list[Any]:
+        targets: list[Any] = []
+        expected_name = self._zone_name.strip().lower()
+        for key, value in self.hass.data.get(DOMAIN, {}).items():
+            if key.startswith("_"):
+                continue
+            zone_info = getattr(value, "zone_info", {}) or {}
+            if not zone_info:
+                coordinator = getattr(value, "coordinator", None)
+                if coordinator and coordinator.data:
+                    zone_info = coordinator.data.get("zone_info", {}) or {}
+            try:
+                zone_value = int(zone_info.get("zone"))
+            except (TypeError, ValueError):
+                zone_value = None
+            zone_name = str(zone_info.get("name", "")).strip().lower()
+            same_zone = zone_value == self._zone_id
+            same_name = bool(expected_name) and zone_name == expected_name
+            if (same_zone or same_name) and getattr(value, "device", None):
+                targets.append(value)
+        return targets
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return zone profile diagnostics."""
+        targets = self._zone_targets()
+        return {
+            "zone_id": self._zone_id,
+            "zone_name": self._zone_name,
+            "member_count": len(targets),
+            "options_count": len(self._attr_options),
+            "options": self._attr_options,
+        }
+
+    def _patch_target_profile(self, target: Any, profile_id: int) -> None:
+        coordinator = getattr(target, "coordinator", None)
+        if not coordinator or not coordinator.data:
+            return
+        updated = dict(coordinator.data)
+        profile = dict(updated.get(SENSOR_KEYS_PROFILE, {}))
+        profile["selected"] = profile_id
+        updated[SENSOR_KEYS_PROFILE] = profile
+        coordinator.async_set_updated_data(updated)
+
+    @staticmethod
+    def _merge_profile_data(candidates: list[dict[str, Any]]) -> dict[str, Any]:
+        """Merge profile payloads and keep the richest profile name set."""
+        merged: dict[str, Any] = {"selected": 0, "startup": 0, "list": []}
+        names_by_id: dict[int, str] = {}
+
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            if isinstance(item.get("selected"), int):
+                merged["selected"] = item.get("selected")
+            if isinstance(item.get("startup"), int):
+                merged["startup"] = item.get("startup")
+            for profile in item.get("list", []):
+                pid = profile.get("id")
+                name = profile.get("name")
+                if isinstance(pid, int) and 0 <= pid <= 5 and isinstance(name, str) and name:
+                    names_by_id[pid] = name
+
+        merged["list"] = [
+            {"id": pid, "name": name}
+            for pid, name in sorted(names_by_id.items(), key=lambda kv: kv[0])
+        ]
+        return merged
+
+    async def async_update(self) -> None:
+        targets = self._zone_targets()
+        if not targets:
+            self._attr_available = False
+            return
+
+        self._attr_available = True
+        candidates: list[dict[str, Any]] = []
+        for target in targets:
+            profile_data = {}
+            if target.coordinator and target.coordinator.data:
+                profile_data = target.coordinator.data.get(SENSOR_KEYS_PROFILE, {})
+            if profile_data:
+                candidates.append(profile_data)
+
+        has_named_profiles = any(
+            isinstance(item, dict) and len(item.get("list", [])) > 0
+            for item in candidates
+        )
+        if not has_named_profiles:
+            for target in targets:
+                try:
+                    profile_data = await target.device.get_profile_list()
+                except Exception:
+                    profile_data = {}
+                if profile_data:
+                    candidates.append(profile_data)
+
+        profile_data = self._merge_profile_data(candidates)
+
+        options, option_to_id, id_to_option = _build_profile_options(profile_data)
+        self._attr_options = options
+        self._option_to_id = option_to_id
+        self._id_to_option = id_to_option
+
+        selected_id = profile_data.get("selected")
+        if isinstance(selected_id, int) and selected_id in self._id_to_option:
+            self._current_option = self._id_to_option[selected_id]
+        elif self._attr_options:
+            self._current_option = self._attr_options[0]
+        else:
+            self._current_option = None
+
+    async def async_select_option(self, option: str) -> None:
+        profile_id = self._option_to_id.get(option)
+        if profile_id is None:
+            return
+
+        for target in self._zone_targets():
+            await target.device.restore_profile(profile_id, startup=False)
+            await asyncio.sleep(0.15)
+            try:
+                current = await target.device.get_profile_list()
+            except Exception:
+                current = {}
+            selected = current.get("selected") if isinstance(current, dict) else None
+            if selected != profile_id:
+                await target.device.restore_profile(profile_id, startup=False)
+            self._patch_target_profile(target, profile_id)
+
+        self._current_option = option
+        self.async_write_ha_state()
+
+    @property
+    def current_option(self) -> str | None:
         return self._current_option

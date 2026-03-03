@@ -51,10 +51,19 @@
       "mac_address": {"name": "MAC 地址"},
       "barcode": {"name": "条形码"},
       "hardware_id": {"name": "硬件 ID"},
+      "model_config": {"name": "型号配置"},
+      "build": {"name": "构建版本"},
+      "base_id": {"name": "基础版本 ID"},
+      "technology": {"name": "技术"},
+      "upgrade_id": {"name": "升级兼容 ID"},
+      "confirm_fw_update": {"name": "确认固件更新"},
       "host_ip": {"name": "主机 IP"},
       "receiver_ip": {"name": "接收器 IP"},
       "dante_name": {"name": "Dante 名称"},
       "dante_friendly_name": {"name": "Dante 友好名称"},
+      "dante_locked": {"name": "Dante 锁定"},
+      "poe_allocated_power": {"name": "PoE 分配功率"},
+      "poe_pd_15w": {"name": "PoE 15W 限功率"},
       "hostname": {"name": "主机名"},
       "zone_name": {"name": "区域名称"},
       "zone_id": {"name": "区域 ID"},
@@ -64,6 +73,9 @@
     "select": {
       "profile": {
         "name": "配置文件"
+      },
+      "zone_profile": {
+        "name": "区域配置文件"
       },
       "power_state": {
         "name": "电源状态",
@@ -89,25 +101,42 @@
       "mute": {"name": "静音"},
       "rj45_leds": {"name": "RJ45 指示灯"},
       "clip_led": {"name": "削波指示灯"}
+    },
+    "number": {
+      "led_intensity": {"name": "LED 亮度"}
     }
   },
   "services": {
     "wake_up": {
       "name": "唤醒",
-      "description": "将设备从待机模式唤醒。"
+      "description": "将设备从待机模式唤醒。",
+      "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"}
+      }
     },
     "set_standby": {
       "name": "设置待机",
-      "description": "将设备设置为待机模式。"
+      "description": "将设备设置为待机模式。",
+      "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"}
+      }
     },
     "boot_device": {
       "name": "启动设备",
-      "description": "启动设备。"
+      "description": "向设备发送 BOOT 电源状态。",
+      "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"}
+      }
     },
     "set_volume_level": {
       "name": "设置音量",
       "description": "设置音量级别。",
       "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"},
         "level": {
           "name": "级别",
           "description": "音量级别（-200 到 0 dB）。"
@@ -118,6 +147,8 @@
       "name": "设置 LED 亮度",
       "description": "设置 LED 亮度。",
       "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"},
         "intensity": {
           "name": "亮度",
           "description": "LED 亮度（0-100）。"
@@ -128,6 +159,8 @@
       "name": "恢复配置文件",
       "description": "恢复保存的配置文件。",
       "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"},
         "profile_id": {
           "name": "配置文件 ID",
           "description": "要恢复的配置文件 ID。"
@@ -136,6 +169,66 @@
           "name": "启动",
           "description": "设置为启动配置文件。"
         }
+      }
+    },
+    "set_network_ipv4": {
+      "name": "设置网络 IPv4",
+      "description": "写入 /network/ipv4 网络设置。",
+      "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"},
+        "hostname": {"name": "主机名", "description": "设备主机名。"},
+        "mode": {"name": "模式", "description": "网络模式：auto 或 static。"},
+        "ip": {"name": "IP 地址", "description": "静态模式下必填。"},
+        "mask": {"name": "子网掩码", "description": "静态模式下必填。"},
+        "gw": {"name": "网关", "description": "静态模式下必填。"},
+        "vol_ip": {"name": "多播 IP", "description": "多播组地址（0.0.0.0 表示关闭多播）。"},
+        "vol_port": {"name": "多播端口", "description": "多播端口（1024-65535）。"},
+        "auth": {"name": "认证", "description": "凭据格式 user:password。"}
+      }
+    },
+    "multicast_set_volume": {
+      "name": "多播设置音量",
+      "description": "发送多播音量命令。",
+      "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"},
+        "level": {"name": "级别", "description": "多播音量 dB（-130 到 0）。"}
+      }
+    },
+    "multicast_set_mute": {
+      "name": "多播设置静音",
+      "description": "发送多播静音命令。",
+      "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"},
+        "mute": {"name": "静音", "description": "true 为静音，false 为取消静音。"}
+      }
+    },
+    "multicast_set_profile": {
+      "name": "多播设置配置文件",
+      "description": "发送多播配置文件命令。",
+      "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"},
+        "profile_id": {"name": "配置文件 ID", "description": "多播配置文件 ID（0-5）。"}
+      }
+    },
+    "multicast_power": {
+      "name": "多播电源",
+      "description": "发送多播电源命令。",
+      "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"},
+        "state": {"name": "状态", "description": "STANDBY 或 BOOT。"}
+      }
+    },
+    "get_api_root": {
+      "name": "获取 API 根信息",
+      "description": "查询 /public/<version>/ 的根返回内容。",
+      "fields": {
+        "zone_id": {"name": "区域 ID", "description": "可选。应用到该区域 ID 内所有音箱。"},
+        "zone_name": {"name": "区域名称", "description": "可选。应用到该区域名称内所有音箱。"}
       }
     }
   }

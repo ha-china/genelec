@@ -1,8 +1,11 @@
 """Media Player platform for Genelec Smart IP integration."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, TYPE_CHECKING
+
+from aiohttp import ClientResponseError
 
 from homeassistant.components.media_player import MediaPlayerEntity
 from homeassistant.components.media_player.const import (
@@ -56,7 +59,26 @@ async def async_setup_entry(
     # Get device info from shared data
     device_info = data.device_info if data else {}
 
-    async_add_entities([GenelecSmartIPMediaPlayer(device, device_info, coordinator)])
+    entities: list[MediaPlayerEntity] = [
+        GenelecSmartIPMediaPlayer(device, device_info, coordinator)
+    ]
+
+    zone_info = data.zone_info if data else {}
+    if (not zone_info) and coordinator and coordinator.data:
+        zone_info = coordinator.data.get("zone_info", {}) or {}
+    try:
+        zone_id = int(zone_info.get("zone")) if zone_info.get("zone") is not None else None
+    except (TypeError, ValueError):
+        zone_id = None
+    if zone_id is not None and zone_id > 0:
+        zone_registry = hass.data[DOMAIN].setdefault("_zone_media_entities", set())
+        zone_key = f"group_zone_{zone_id}"
+        if zone_key not in zone_registry:
+            zone_registry.add(zone_key)
+            zone_name = str(zone_info.get("name") or f"Zone {zone_id}")
+            entities.append(GenelecZoneMediaPlayer(hass, zone_id, zone_name))
+
+    async_add_entities(entities)
 
 
 class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
@@ -239,7 +261,14 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
             api_source = INPUT_DISPLAY_TO_API.get(source, source)
             api_sources = [api_source]
         
-        await self._device.set_inputs(api_sources)
+        try:
+            await self._device.set_inputs(api_sources)
+        except ClientResponseError as err:
+            if err.status == 404:
+                await self._device.wake_up()
+                await self._device.set_inputs(api_sources)
+            else:
+                raise
         self._current_sources = api_sources
         self._current_source = source
         self._push_coordinator_patch({"inputs": {"input": api_sources}})
@@ -288,4 +317,272 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         await self._device.set_standby()
         self._power_state = POWER_STATE_STANDBY
         self._push_coordinator_patch({"power": {"state": POWER_STATE_STANDBY}})
+        self.async_write_ha_state()
+
+
+class GenelecZoneMediaPlayer(MediaPlayerEntity):
+    """Virtual media player that controls all speakers in a zone."""
+
+    _attr_supported_features = (
+        MediaPlayerEntityFeature.VOLUME_SET
+        | MediaPlayerEntityFeature.VOLUME_MUTE
+        | MediaPlayerEntityFeature.SELECT_SOURCE
+        | MediaPlayerEntityFeature.TURN_ON
+        | MediaPlayerEntityFeature.TURN_OFF
+    )
+    _attr_should_poll = True
+
+    def __init__(self, hass: HomeAssistant, zone_id: int, zone_name: str) -> None:
+        self.hass = hass
+        self._zone_id = zone_id
+        self._zone_name = zone_name
+        self._attr_has_entity_name = True
+        self._attr_name = "Group"
+        self._attr_unique_id = f"genelec_group_zone_{zone_id}_media"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"group_zone_{zone_id}")},
+            "name": f"Genelec Zone {zone_name}",
+            "manufacturer": "Genelec",
+            "model": "Zone Group",
+        }
+
+        self._volume = -5.0
+        self._is_muted = False
+        self._power_state = POWER_STATE_STANDBY
+        self._current_source = INPUT_NONE
+        self._source_list = [INPUT_NONE, INPUT_ANALOG, INPUT_AOIP_01, INPUT_AOIP_02, INPUT_MIX]
+
+    def _zone_targets(self) -> list[Any]:
+        targets: list[Any] = []
+        expected_name = self._zone_name.strip().lower()
+        for key, value in self.hass.data.get(DOMAIN, {}).items():
+            if key.startswith("_"):
+                continue
+            zone_info = getattr(value, "zone_info", {}) or {}
+            if not zone_info:
+                coordinator = getattr(value, "coordinator", None)
+                if coordinator and coordinator.data:
+                    zone_info = coordinator.data.get("zone_info", {}) or {}
+            try:
+                zone_value = int(zone_info.get("zone"))
+            except (TypeError, ValueError):
+                zone_value = None
+            zone_name = str(zone_info.get("name", "")).strip().lower()
+            same_zone = zone_value == self._zone_id
+            same_name = bool(expected_name) and zone_name == expected_name
+            if (same_zone or same_name) and getattr(value, "device", None):
+                targets.append(value)
+        return targets
+
+    async def _wake_target_if_needed(self, target: Any) -> None:
+        """Wake target if it is not ACTIVE before control commands."""
+        state = None
+        if target.coordinator and target.coordinator.data:
+            state = (target.coordinator.data.get("power", {}) or {}).get("state")
+        if state != POWER_STATE_ACTIVE:
+            await target.device.wake_up()
+            self._patch_target(target, {"power": {"state": POWER_STATE_ACTIVE}})
+
+    async def _set_target_volume_with_verify(
+        self,
+        target: Any,
+        *,
+        level: float | None = None,
+        mute: bool | None = None,
+    ) -> dict[str, Any]:
+        """Set volume/mute and verify by reading device state."""
+        await self._wake_target_if_needed(target)
+        await target.device.set_volume(level=level, mute=mute)
+        await asyncio.sleep(0.15)
+        current = await target.device.get_volume()
+
+        level_ok = True
+        if level is not None and isinstance(current.get("level"), (int, float)):
+            level_ok = abs(float(current["level"]) - float(level)) <= 0.2
+
+        mute_ok = True
+        if mute is not None and isinstance(current.get("mute"), bool):
+            mute_ok = bool(current["mute"]) == bool(mute)
+
+        if not (level_ok and mute_ok):
+            await target.device.set_volume(level=level, mute=mute)
+            await asyncio.sleep(0.15)
+            current = await target.device.get_volume()
+
+        # Some firmware builds effectively use -130..0 even when docs say -200..0.
+        # If write still does not stick, retry once with -130 clamp.
+        if level is not None and isinstance(current.get("level"), (int, float)):
+            if abs(float(current["level"]) - float(level)) > 0.2:
+                fallback_level = max(-130.0, min(0.0, float(level)))
+                if abs(fallback_level - float(level)) > 0.05:
+                    await target.device.set_volume(level=fallback_level, mute=mute)
+                    await asyncio.sleep(0.15)
+                    current = await target.device.get_volume()
+
+        return current
+
+    async def _set_target_inputs_with_verify(self, target: Any, api_sources: list[str]) -> list[str]:
+        """Set inputs and verify by reading /audio/inputs."""
+        await self._wake_target_if_needed(target)
+        try:
+            await target.device.set_inputs(api_sources)
+        except ClientResponseError as err:
+            if err.status == 404:
+                await target.device.wake_up()
+                await target.device.set_inputs(api_sources)
+            else:
+                raise
+
+        await asyncio.sleep(0.15)
+        current_inputs = await target.device.get_inputs()
+        current = current_inputs.get("input", []) if isinstance(current_inputs, dict) else []
+        if list(current) != list(api_sources):
+            await target.device.set_inputs(api_sources)
+            await asyncio.sleep(0.15)
+            current_inputs = await target.device.get_inputs()
+            current = current_inputs.get("input", []) if isinstance(current_inputs, dict) else []
+
+        return list(current)
+
+    def _zone_diagnostics(self, targets: list[Any]) -> dict[str, Any]:
+        """Build diagnostics payload for zone controls."""
+        members: list[str] = []
+        hosts: list[str] = []
+        endpoints: list[str] = []
+        for target in targets:
+            device = getattr(target, "device", None)
+            if device:
+                members.append(getattr(device, "name", "unknown"))
+                hosts.append(getattr(device, "_host", "unknown"))
+
+            network = getattr(target, "network_config", {}) or {}
+            if not network and target.coordinator and target.coordinator.data:
+                network = target.coordinator.data.get("network_ipv4", {}) or {}
+            vol_ip = network.get("volIp")
+            vol_port = network.get("volPort")
+            if vol_ip and vol_port:
+                endpoints.append(f"{vol_ip}:{vol_port}")
+
+        unique_endpoints = sorted(set(endpoints))
+        return {
+            "zone_id": self._zone_id,
+            "zone_name": self._zone_name,
+            "member_count": len(targets),
+            "members": members,
+            "hosts": hosts,
+            "multicast_endpoints": unique_endpoints,
+            "multicast_consistent": len(unique_endpoints) <= 1,
+        }
+
+    def _patch_target(self, target: Any, patch: dict[str, Any]) -> None:
+        coordinator = getattr(target, "coordinator", None)
+        if not coordinator or not coordinator.data:
+            return
+        updated = dict(coordinator.data)
+        for key, value in patch.items():
+            merged = dict(updated.get(key, {}))
+            merged.update(value)
+            updated[key] = merged
+        coordinator.async_set_updated_data(updated)
+
+    async def async_update(self) -> None:
+        targets = self._zone_targets()
+        if not targets:
+            self._attr_available = False
+            return
+
+        self._attr_available = True
+        sample = targets[0]
+        payload = sample.coordinator.data if sample.coordinator and sample.coordinator.data else {}
+        volume_data = payload.get("volume", {})
+        power_data = payload.get("power", {})
+        inputs_data = payload.get("inputs", {})
+
+        self._volume = volume_data.get("level", self._volume)
+        self._is_muted = volume_data.get("mute", self._is_muted)
+        self._power_state = power_data.get("state", self._power_state)
+
+        inputs = inputs_data.get("input", [])
+        if not inputs:
+            self._current_source = INPUT_NONE
+        elif len(inputs) > 1:
+            self._current_source = INPUT_MIX
+        else:
+            self._current_source = INPUT_API_TO_DISPLAY.get(inputs[0], inputs[0])
+
+        self._attr_state = MediaPlayerState.ON if self._power_state == POWER_STATE_ACTIVE else MediaPlayerState.OFF
+
+    @property
+    def source(self) -> str | None:
+        return self._current_source
+
+    @property
+    def source_list(self) -> list[str] | None:
+        return self._source_list
+
+    @property
+    def volume_level(self) -> float:
+        span = MAX_VOLUME_DB - MIN_VOLUME_DB
+        if span <= 0:
+            return 0.0
+        return max(0.0, min(1.0, (self._volume - MIN_VOLUME_DB) / span))
+
+    @property
+    def is_volume_muted(self) -> bool:
+        return self._is_muted
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return zone diagnostics to help troubleshooting."""
+        return self._zone_diagnostics(self._zone_targets())
+
+    async def async_select_source(self, source: str) -> None:
+        if source == INPUT_NONE:
+            api_sources = []
+        elif source == INPUT_MIX:
+            api_sources = list(INPUT_DISPLAY_TO_API.values())
+        else:
+            api_sources = [INPUT_DISPLAY_TO_API.get(source, source)]
+
+        applied = api_sources
+        for target in self._zone_targets():
+            applied = await self._set_target_inputs_with_verify(target, api_sources)
+            self._patch_target(target, {"inputs": {"input": applied}})
+
+        self._current_source = source
+        self.async_write_ha_state()
+
+    async def async_mute_volume(self, mute: bool) -> None:
+        for target in self._zone_targets():
+            current = await self._set_target_volume_with_verify(target, mute=mute)
+            self._patch_target(target, {"volume": {"mute": current.get("mute", mute)}})
+
+        self._is_muted = mute
+        self.async_write_ha_state()
+
+    async def async_set_volume_level(self, volume: float) -> None:
+        level = MIN_VOLUME_DB + (max(0.0, min(1.0, volume)) * (MAX_VOLUME_DB - MIN_VOLUME_DB))
+        for target in self._zone_targets():
+            current = await self._set_target_volume_with_verify(target, level=level)
+            self._patch_target(target, {"volume": {"level": current.get("level", level)}})
+
+        self._volume = level
+        self.async_write_ha_state()
+
+    async def async_turn_on(self) -> None:
+        for target in self._zone_targets():
+            await target.device.wake_up()
+            self._patch_target(target, {"power": {"state": POWER_STATE_ACTIVE}})
+
+        self._power_state = POWER_STATE_ACTIVE
+        self._attr_state = MediaPlayerState.ON
+        self.async_write_ha_state()
+
+    async def async_turn_off(self) -> None:
+        for target in self._zone_targets():
+            await target.device.set_standby()
+            self._patch_target(target, {"power": {"state": POWER_STATE_STANDBY}})
+
+        self._power_state = POWER_STATE_STANDBY
+        self._attr_state = MediaPlayerState.OFF
         self.async_write_ha_state()

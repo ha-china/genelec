@@ -91,11 +91,20 @@ async def async_setup_entry(
         GenelecMACSensor(device, device_info, coordinator, device_id),
         GenelecBarcodeSensor(device, device_info, coordinator, device_id),
         GenelecHWIDSensor(device, device_info, coordinator, device_id),
+        GenelecModelConfigSensor(device, device_info, coordinator, device_id),
+        GenelecBuildSensor(device, device_info, coordinator),
+        GenelecBaseIdSensor(device, device_info, coordinator),
+        GenelecTechnologySensor(device, device_info, coordinator),
+        GenelecUpgradeIdSensor(device, device_info, coordinator),
+        GenelecConfirmFwUpdateSensor(device, device_info, coordinator),
         GenelecHostIPSensor(device, device_info, coordinator),
         GenelecReceiverIPSensor(device, device_info, coordinator, aoip_ipv4),
         GenelecDanteNameSensor(device, device_info, coordinator, aoip_identity),
         GenelecDanteFriendlyNameSensor(device, device_info, coordinator, aoip_identity),
+        GenelecDanteLockedSensor(device, device_info, coordinator, aoip_identity),
         GenelecHostnameSensor(device, device_info, coordinator, network_config),
+        GenelecPoeAllocatedPowerSensor(device, device_info, coordinator),
+        GenelecPoePd15WSensor(device, device_info, coordinator),
         GenelecZoneNameSensor(device, device_info, coordinator, zone_info),
         GenelecZoneIDSensor(device, device_info, coordinator, zone_info),
         GenelecCurrentProfileSensor(device, device_info, coordinator, profile_list),
@@ -482,6 +491,135 @@ class GenelecHWIDSensor(GenelecBaseSensor):
         pass
 
 
+class GenelecModelConfigSensor(GenelecBaseSensor):
+    """Sensor for model configuration (modId)."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "model_config"
+    _attr_icon = "mdi:tune"
+
+    @property
+    def _name_suffix(self) -> str:
+        return "model_config"
+
+    def __init__(self, device: GenelecSmartIPDevice,
+                 device_info: dict[str, Any], coordinator: DataUpdateCoordinator | None = None,
+                 device_id: dict[str, Any] | None = None) -> None:
+        """Initialize the sensor."""
+        super().__init__(device, device_info, coordinator)
+        self._attr_native_value = device_id.get("modId") if device_id else None
+
+    def _handle_coordinator_update(self) -> None:
+        """Model config doesn't change, no update needed."""
+        pass
+
+
+class GenelecBuildSensor(GenelecBaseSensor):
+    """Sensor for firmware build id."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "build"
+    _attr_icon = "mdi:source-branch"
+
+    @property
+    def _name_suffix(self) -> str:
+        return "build"
+
+    def __init__(self, device: GenelecSmartIPDevice,
+                 device_info: dict[str, Any], coordinator: DataUpdateCoordinator | None = None) -> None:
+        super().__init__(device, device_info, coordinator)
+        self._attr_native_value = device_info.get("build")
+
+    def _handle_coordinator_update(self) -> None:
+        pass
+
+
+class GenelecBaseIdSensor(GenelecBaseSensor):
+    """Sensor for base platform software id."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "base_id"
+    _attr_icon = "mdi:identifier"
+
+    @property
+    def _name_suffix(self) -> str:
+        return "base_id"
+
+    def __init__(self, device: GenelecSmartIPDevice,
+                 device_info: dict[str, Any], coordinator: DataUpdateCoordinator | None = None) -> None:
+        super().__init__(device, device_info, coordinator)
+        self._attr_native_value = device_info.get("baseId")
+
+    def _handle_coordinator_update(self) -> None:
+        pass
+
+
+class GenelecTechnologySensor(GenelecBaseSensor):
+    """Sensor for technology field."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "technology"
+    _attr_icon = "mdi:chip"
+
+    @property
+    def _name_suffix(self) -> str:
+        return "technology"
+
+    def __init__(self, device: GenelecSmartIPDevice,
+                 device_info: dict[str, Any], coordinator: DataUpdateCoordinator | None = None) -> None:
+        super().__init__(device, device_info, coordinator)
+        self._attr_native_value = device_info.get("technology")
+
+    def _handle_coordinator_update(self) -> None:
+        pass
+
+
+class GenelecUpgradeIdSensor(GenelecBaseSensor):
+    """Sensor for firmware upgrade compatibility id."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "upgrade_id"
+    _attr_icon = "mdi:upload"
+
+    @property
+    def _name_suffix(self) -> str:
+        return "upgrade_id"
+
+    def __init__(self, device: GenelecSmartIPDevice,
+                 device_info: dict[str, Any], coordinator: DataUpdateCoordinator | None = None) -> None:
+        super().__init__(device, device_info, coordinator)
+        self._attr_native_value = device_info.get("upgradeId")
+
+    def _handle_coordinator_update(self) -> None:
+        pass
+
+
+class GenelecConfirmFwUpdateSensor(GenelecBaseSensor):
+    """Sensor for firmware confirmation flag."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "confirm_fw_update"
+    _attr_icon = "mdi:alert-circle-check"
+
+    @property
+    def _name_suffix(self) -> str:
+        return "confirm_fw_update"
+
+    def __init__(self, device: GenelecSmartIPDevice,
+                 device_info: dict[str, Any], coordinator: DataUpdateCoordinator | None = None) -> None:
+        super().__init__(device, device_info, coordinator)
+        self._attr_native_value = device_info.get("confirmFwUpdate")
+
+    def _handle_coordinator_update(self) -> None:
+        pass
+
+
 class GenelecHostIPSensor(GenelecBaseSensor):
     """Sensor for device host IP (control IP)."""
 
@@ -644,6 +782,35 @@ class GenelecDanteFriendlyNameSensor(GenelecBaseSensor):
             self.async_write_ha_state()
 
 
+class GenelecDanteLockedSensor(GenelecBaseSensor):
+    """Sensor for Dante lock status."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "dante_locked"
+    _attr_icon = "mdi:lock"
+
+    @property
+    def _name_suffix(self) -> str:
+        return "dante_locked"
+
+    @property
+    def _coordinator_key(self) -> str:
+        return SENSOR_KEYS_AOIP_IDENTITY
+
+    def __init__(self, device: GenelecSmartIPDevice,
+                 device_info: dict[str, Any], coordinator: DataUpdateCoordinator | None = None,
+                 initial_data: dict[str, Any] | None = None) -> None:
+        super().__init__(device, device_info, coordinator)
+        self._attr_native_value = initial_data.get("locked") if initial_data else None
+
+    def _handle_coordinator_update(self) -> None:
+        if self._coordinator and self._coordinator.data:
+            aoip_identity = self._coordinator.data.get(SENSOR_KEYS_AOIP_IDENTITY, {})
+            self._attr_native_value = aoip_identity.get("locked") if aoip_identity else None
+            self.async_write_ha_state()
+
+
 class GenelecHostnameSensor(GenelecBaseSensor):
     """Sensor for device hostname."""
 
@@ -687,6 +854,54 @@ class GenelecHostnameSensor(GenelecBaseSensor):
                 _LOGGER.debug("Hostname sensor value: %s", hostname)
             else:
                 self._attr_native_value = None
+            self.async_write_ha_state()
+
+
+class GenelecPoeAllocatedPowerSensor(GenelecBaseSensor):
+    """Sensor for PoE allocated power."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "poe_allocated_power"
+    _attr_icon = "mdi:flash"
+    _attr_native_unit_of_measurement = "W"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def _name_suffix(self) -> str:
+        return "poe_allocated_power"
+
+    def _init_from_coordinator_data(self, data: dict[str, Any]) -> None:
+        power_data = data.get("power", {})
+        self._attr_native_value = power_data.get("poeAllocatedPwr")
+
+    def _handle_coordinator_update(self) -> None:
+        if self._coordinator and self._coordinator.data:
+            power_data = self._coordinator.data.get("power", {})
+            self._attr_native_value = power_data.get("poeAllocatedPwr")
+            self.async_write_ha_state()
+
+
+class GenelecPoePd15WSensor(GenelecBaseSensor):
+    """Sensor for PoE PD 15W limit mode."""
+
+    _attr_entity_registry_enabled_default = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_translation_key = "poe_pd_15w"
+    _attr_icon = "mdi:power-plug"
+
+    @property
+    def _name_suffix(self) -> str:
+        return "poe_pd_15w"
+
+    def _init_from_coordinator_data(self, data: dict[str, Any]) -> None:
+        power_data = data.get("power", {})
+        self._attr_native_value = power_data.get("poePd15W")
+
+    def _handle_coordinator_update(self) -> None:
+        if self._coordinator and self._coordinator.data:
+            power_data = self._coordinator.data.get("power", {})
+            self._attr_native_value = power_data.get("poePd15W")
             self.async_write_ha_state()
 
 

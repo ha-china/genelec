@@ -37,6 +37,26 @@ A custom integration for Home Assistant to control Genelec Smart IP series studi
 - LED brightness control
 - Profile management
 - Dante/AoIP settings
+- Zone group entities (group media/profile/LED intensity)
+- Multicast control services (volume/mute/profile/power)
+
+## API Coverage (Smart IP API v1 rev 0.8.4)
+
+This integration is implemented against `Smart IP API Documentation v1 rev 0.8.4`.
+
+- `4.6 API version`: `GET /public/{version}/` (with `/device/info` fallback)
+- `4.7 /aoip`: `GET /aoip/dante/identity`, `GET /aoip/ipv4`
+- `4.8 /audio`: `GET/PUT /audio/inputs`, `GET/PUT /audio/volume`
+- `4.9 /device`: `GET /device/id`, `GET /device/info`, `GET/PUT /device/pwr`
+- `4.10 /events`: `GET /events`
+- `4.11 /led`: `GET/PUT /device/led` (including LED intensity number entity)
+- `4.12 /network`: `GET/PUT /network/ipv4`, `GET /network/zone`
+- `4.13 /profile`: `GET /profile/list`, `PUT /profile/restore`
+- `6 multicast`: `mcast.level`, `mcast.mute`, `mcast.profile`, `mcast.state`
+
+Notes:
+- Discovery is supported via mDNS (`_smart_ip._tcp`).
+- Use Smart IP Manager and API control carefully; concurrent control can desync state.
 
 ## Supported Devices
 
@@ -61,6 +81,24 @@ Set the front panel LED intensity.
 
 ### restore_profile
 Restore a saved profile from device memory.
+
+### set_network_ipv4
+Write network IPv4 configuration (`/network/ipv4`).
+
+### multicast_set_volume
+Send multicast volume command (`mcast.level`).
+
+### multicast_set_mute
+Send multicast mute command (`mcast.mute`).
+
+### multicast_set_profile
+Send multicast profile command (`mcast.profile`).
+
+### multicast_power
+Send multicast power command (`mcast.state`).
+
+### get_api_root
+Query API root payload from `/public/<version>/`.
 
 ## License
 

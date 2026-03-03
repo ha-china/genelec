@@ -26,6 +26,7 @@ PLATFORMS = [
     Platform.SENSOR,
     Platform.SELECT,
     Platform.SWITCH,
+    Platform.NUMBER,
 ]
 
 # Scan interval for polling
@@ -65,6 +66,7 @@ INPUT_DISPLAY_TO_API = {v: k for k, v in INPUT_API_TO_DISPLAY.items()}
 
 # Endpoints
 API_BASE = "/public/{version}"
+ENDPOINT_API_ROOT = "/"
 ENDPOINT_DEVICE_ID = "/device/id"
 ENDPOINT_DEVICE_INFO = "/device/info"
 ENDPOINT_DEVICE_PWR = "/device/pwr"

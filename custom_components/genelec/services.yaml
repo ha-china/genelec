@@ -5,6 +5,23 @@ wake_up:
     entity:
       domain: media_player
       integration: genelec
+  fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
 
 set_standby:
   name: Set standby
@@ -13,14 +30,48 @@ set_standby:
     entity:
       domain: media_player
       integration: genelec
+  fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
 
 boot_device:
   name: Boot device
-  description: Boot the device.
+  description: Send BOOT power state to the device.
   target:
     entity:
       domain: media_player
       integration: genelec
+  fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
 
 set_volume_level:
   name: Set volume level
@@ -30,6 +81,22 @@ set_volume_level:
       domain: media_player
       integration: genelec
   fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
     level:
       name: Level
       description: Volume level in dB (-200.0 to 0.0)
@@ -48,6 +115,22 @@ set_led_intensity:
     entity:
       integration: genelec
   fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
     intensity:
       name: Intensity
       description: LED intensity percentage (0-100)
@@ -66,6 +149,22 @@ restore_profile:
     entity:
       integration: genelec
   fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
     profile_id:
       name: Profile ID
       description: Profile ID to restore (integer 0-5)
@@ -83,3 +182,237 @@ restore_profile:
       default: false
       selector:
         boolean:
+
+set_network_ipv4:
+  name: Set network IPv4
+  description: Write /network/ipv4 settings.
+  target:
+    entity:
+      integration: genelec
+  fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
+    hostname:
+      name: Hostname
+      description: Device hostname (1-63 chars).
+      required: false
+      selector:
+        text:
+    mode:
+      name: Mode
+      description: Network mode.
+      required: false
+      selector:
+        select:
+          options:
+            - auto
+            - static
+    ip:
+      name: IP address
+      description: Required when mode is static.
+      required: false
+      selector:
+        text:
+    mask:
+      name: Netmask
+      description: Required when mode is static.
+      required: false
+      selector:
+        text:
+    gw:
+      name: Gateway
+      description: Required when mode is static.
+      required: false
+      selector:
+        text:
+    vol_ip:
+      name: Multicast IP
+      description: Multicast group IP, set 0.0.0.0 to disable multicast.
+      required: false
+      selector:
+        text:
+    vol_port:
+      name: Multicast port
+      description: Multicast port (1024-65535).
+      required: false
+      selector:
+        number:
+          min: 1024
+          max: 65535
+          step: 1
+          mode: box
+    auth:
+      name: Auth
+      description: Credentials in user:password format.
+      required: false
+      selector:
+        text:
+
+multicast_set_volume:
+  name: Multicast set volume
+  description: Send multicast volume command (mcast.level).
+  target:
+    entity:
+      integration: genelec
+  fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
+    level:
+      name: Level
+      description: Multicast volume in dB (-130.0 to 0.0).
+      required: true
+      selector:
+        number:
+          min: -130.0
+          max: 0.0
+          step: 0.1
+          mode: slider
+
+multicast_set_mute:
+  name: Multicast set mute
+  description: Send multicast mute command (mcast.mute).
+  target:
+    entity:
+      integration: genelec
+  fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
+    mute:
+      name: Mute
+      description: True to mute, false to unmute.
+      required: true
+      selector:
+        boolean:
+
+multicast_set_profile:
+  name: Multicast set profile
+  description: Send multicast profile command (mcast.profile).
+  target:
+    entity:
+      integration: genelec
+  fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
+    profile_id:
+      name: Profile ID
+      description: Multicast profile id (0-5).
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 5
+          step: 1
+          mode: box
+
+multicast_power:
+  name: Multicast power
+  description: Send multicast power command (mcast.state).
+  target:
+    entity:
+      integration: genelec
+  fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
+    state:
+      name: State
+      description: STANDBY or BOOT.
+      required: true
+      selector:
+        select:
+          options:
+            - STANDBY
+            - BOOT
+
+get_api_root:
+  name: Get API root
+  description: Query /public/<version>/ root payload from device.
+  target:
+    entity:
+      integration: genelec
+  fields:
+    zone_id:
+      name: Zone ID
+      description: Optional. Apply to all Genelec speakers in this zone ID.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+    zone_name:
+      name: Zone name
+      description: Optional. Apply to all Genelec speakers with this exact zone name.
+      required: false
+      selector:
+        text:
