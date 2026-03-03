@@ -140,8 +140,8 @@ class GenelecZoneLedIntensityNumber(_LedBase, NumberEntity):
         self._attr_name = f"{zone_name} LED Intensity"
         self._attr_unique_id = f"genelec_group_zone_{zone_id}_led_intensity"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, GROUP_HUB_ID)},
-            "name": "Genelec Zone",
+            "identifiers": {(DOMAIN, f"group_zone_{zone_id}")},
+            "name": zone_name,
             "manufacturer": "Genelec",
             "model": "Zone Group",
         }

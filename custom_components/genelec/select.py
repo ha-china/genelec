@@ -355,8 +355,8 @@ class GenelecZoneProfileSelect(SelectEntity):
         self._attr_name = f"{zone_name} Profile"
         self._attr_unique_id = f"genelec_group_zone_{zone_id}_profile"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, GROUP_HUB_ID)},
-            "name": "Genelec Zone",
+            "identifiers": {(DOMAIN, f"group_zone_{zone_id}")},
+            "name": zone_name,
             "manufacturer": "Genelec",
             "model": "Zone Group",
         }
