@@ -35,7 +35,6 @@ from .const import (
     DOMAIN,
     LOGGER,
     SCAN_INTERVAL,
-    SINGLE_HUB_ID,
     SENSOR_KEYS_AOIP_IDENTITY,
     SENSOR_KEYS_AOIP_IPV4,
     SENSOR_KEYS_EVENTS,
@@ -132,7 +131,7 @@ class GenelecBaseSensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"{device.unique_id}_{self._name_suffix}"
         self._attr_name = self._name_suffix
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, SINGLE_HUB_ID)},
+            "identifiers": {(DOMAIN, device.unique_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",

@@ -26,7 +26,6 @@ from .const import (
     CONF_ZONE_NAME,
     DOMAIN,
     GROUP_HUB_ID,
-    SINGLE_HUB_ID,
     ENTRY_TYPE_DEVICE,
     ENTRY_TYPE_GROUP,
     INPUT_AOIP_01,
@@ -140,7 +139,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         self._attr_name = "Speaker"
         self._attr_unique_id = device.unique_id
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, SINGLE_HUB_ID)},
+            "identifiers": {(DOMAIN, device.unique_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",

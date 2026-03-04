@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .const import CONF_ENTRY_TYPE, CONF_ZONE_ID, CONF_ZONE_NAME, ENTRY_TYPE_DEVICE, ENTRY_TYPE_GROUP, SINGLE_HUB_ID, GROUP_HUB_ID
+from .const import CONF_ENTRY_TYPE, CONF_ZONE_ID, CONF_ZONE_NAME, ENTRY_TYPE_DEVICE, ENTRY_TYPE_GROUP, GROUP_HUB_ID
 
 
 async def async_setup_entry(
@@ -91,7 +91,7 @@ class GenelecLedIntensityNumber(_LedBase, CoordinatorEntity, NumberEntity):
         self._attr_name = "LED Intensity"
         self._attr_unique_id = f"{device.unique_id}_led_intensity"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, SINGLE_HUB_ID)},
+            "identifiers": {(DOMAIN, device.unique_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",

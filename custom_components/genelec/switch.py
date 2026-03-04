@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 if TYPE_CHECKING:
     from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN, LOGGER, SINGLE_HUB_ID
+from .const import DOMAIN, LOGGER
 from .device import GenelecSmartIPDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class GenelecRJ45LedsSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_name = "RJ45 LEDs"
         self._attr_unique_id = f"{device.unique_id}_rj45_leds"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, SINGLE_HUB_ID)},
+            "identifiers": {(DOMAIN, device.unique_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",
@@ -152,7 +152,7 @@ class GenelecClipLedSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_name = "Clip LED"
         self._attr_unique_id = f"{device.unique_id}_clip_led"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, SINGLE_HUB_ID)},
+            "identifiers": {(DOMAIN, device.unique_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",

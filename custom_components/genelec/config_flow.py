@@ -100,9 +100,9 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         await self.async_set_unique_id(device.unique_id)
                         self._abort_if_unique_id_configured()
                         payload = dict(user_input)
-                        payload[CONF_DEVICE_NAME] = device_name
+                        payload[CONF_DEVICE_NAME] = f"{device_name} [{user_input[CONF_HOST]}]"
                         payload[CONF_ENTRY_TYPE] = ENTRY_TYPE_DEVICE
-                        return self.async_create_entry(title="Genelec Device", data=payload)
+                        return self.async_create_entry(title=payload[CONF_DEVICE_NAME], data=payload)
                     else:
                         errors["base"] = "cannot_connect"
             except Exception:  # pylint: disable=broad-except
@@ -245,10 +245,10 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_USERNAME: user_input.get(CONF_USERNAME, DEFAULT_USERNAME),
                             CONF_PASSWORD: user_input.get(CONF_PASSWORD, DEFAULT_PASSWORD),
                             CONF_API_VERSION: DEFAULT_API_VERSION,
-                            CONF_DEVICE_NAME: device_info.get("name") or "Genelec Smart IP",
+                            CONF_DEVICE_NAME: f"{(device_info.get('name') or 'Genelec Smart IP')} [{device_info[CONF_HOST]}]",
                             CONF_ENTRY_TYPE: ENTRY_TYPE_DEVICE,
                         }
-                        return self.async_create_entry(title="Genelec Device", data=data)
+                        return self.async_create_entry(title=data[CONF_DEVICE_NAME], data=data)
                     else:
                         errors["base"] = "cannot_connect"
             except Exception:  # pylint: disable=broad-except

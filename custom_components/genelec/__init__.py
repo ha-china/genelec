@@ -123,8 +123,6 @@ async def async_setup_entry(hass: HomeAssistant,
 
     if entry_type == ENTRY_TYPE_GROUP and entry.title != "Genelec Zone":
         hass.config_entries.async_update_entry(entry, title="Genelec Zone")
-    if entry_type == ENTRY_TYPE_DEVICE and entry.title != "Genelec Device":
-        hass.config_entries.async_update_entry(entry, title="Genelec Device")
 
     # Group-only entry: expose zone entities without creating direct device connection.
     if entry_type == ENTRY_TYPE_GROUP:

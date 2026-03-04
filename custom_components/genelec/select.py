@@ -30,7 +30,6 @@ from .const import (
     POWER_STATE_ISS_SLEEP,
     POWER_STATE_PWR_FAIL,
     POWER_STATE_STANDBY,
-    SINGLE_HUB_ID,
     SENSOR_KEYS_PROFILE,
 )
 from .device import GenelecSmartIPDevice
@@ -141,7 +140,7 @@ class GenelecPowerStateSelect(CoordinatorEntity, SelectEntity):
         self._attr_name = "Power State"
         self._attr_unique_id = f"{device.unique_id}_power_state"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, SINGLE_HUB_ID)},
+            "identifiers": {(DOMAIN, device.unique_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",
@@ -262,7 +261,7 @@ class GenelecProfileSelect(CoordinatorEntity, SelectEntity):
         self._attr_name = "Profile"
         self._attr_unique_id = f"{device.unique_id}_profile"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, SINGLE_HUB_ID)},
+            "identifiers": {(DOMAIN, device.unique_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",
