@@ -395,7 +395,7 @@ multicast_power:
 
 get_api_root:
   name: Get API root
-  description: Query /public/<version>/ root payload from device.
+  description: Query /public/{version}/ root payload from device.
   target:
     entity:
       integration: genelec
