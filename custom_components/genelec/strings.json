@@ -241,7 +241,7 @@
     },
     "get_api_root": {
       "name": "Get API Root",
-      "description": "Query API root payload from /public/<version>/.",
+      "description": "Query API root payload from /public/{version}/.",
       "fields": {
         "zone_id": {"name": "Zone ID", "description": "Optional. Apply to all speakers in this zone ID."},
         "zone_name": {"name": "Zone Name", "description": "Optional. Apply to all speakers in this zone name."}
