@@ -42,6 +42,8 @@ from .const import (
     POWER_STATE_BOOT,
     POWER_STATE_STANDBY,
     PLATFORMS,
+    SINGLE_HUB_ID,
+    SINGLE_HUB_NAME,
 )
 from .diagnostics import (
     async_get_config_entry_diagnostics,
@@ -184,6 +186,21 @@ async def async_setup_entry(hass: HomeAssistant,
         device._device_info = device_info_data
     except Exception as e:
         LOGGER.warning("Failed to get device_info during setup: %s", e)
+
+    if entry_type == ENTRY_TYPE_DEVICE:
+        dev_reg = dr.async_get(hass)
+        dev_reg.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, SINGLE_HUB_ID)},
+            name=SINGLE_HUB_NAME,
+            manufacturer="Genelec",
+            model="Smart IP",
+        )
+        if data.device_info is None:
+            data.device_info = {}
+        data.device_info["_via_device"] = (DOMAIN, SINGLE_HUB_ID)
+        if getattr(device, "_device_info", None) is not None:
+            device._device_info = data.device_info
 
     # Create coordinator for centralized updates
     async def async_update_data():

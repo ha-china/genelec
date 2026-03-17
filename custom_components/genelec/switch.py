@@ -70,6 +70,9 @@ class GenelecRJ45LedsSwitch(CoordinatorEntity, SwitchEntity):
             "manufacturer": "Genelec",
             "model": "Smart IP",
         }
+        via_device = device_info.get("_via_device")
+        if via_device:
+            self._attr_device_info["via_device"] = via_device
         self._attr_has_entity_name = True
         self._rj45_enabled = True
 
@@ -157,6 +160,9 @@ class GenelecClipLedSwitch(CoordinatorEntity, SwitchEntity):
             "manufacturer": "Genelec",
             "model": "Smart IP",
         }
+        via_device = device_info.get("_via_device")
+        if via_device:
+            self._attr_device_info["via_device"] = via_device
         self._attr_has_entity_name = True
         self._clip_enabled = False
 
