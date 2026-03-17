@@ -27,7 +27,7 @@ CONF_DEVICE_NAME = "device_name"
 ENTRY_TYPE_DEVICE = "device"
 ENTRY_TYPE_GROUP = "group"
 
-SINGLE_HUB_ID = "genelec_single_hub"
+SINGLE_HUB_ID = "genelec_devices_hub"
 GROUP_HUB_ID = "genelec_group_hub"
 SINGLE_HUB_NAME = "Genelec Devices"
 

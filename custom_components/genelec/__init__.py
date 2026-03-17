@@ -195,7 +195,7 @@ async def async_setup_entry(hass: HomeAssistant,
             identifiers={(DOMAIN, SINGLE_HUB_ID)},
             name=SINGLE_HUB_NAME,
             manufacturer="Genelec",
-            model="Smart IP Hub",
+            model="Smart IP Group",
         )
         device_entry = dev_reg.async_get_or_create(
             config_entry_id=entry.entry_id,
