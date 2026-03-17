@@ -136,9 +136,6 @@ class GenelecBaseSensor(CoordinatorEntity, SensorEntity):
             "manufacturer": "Genelec",
             "model": "Smart IP",
         }
-        via_device = device_info.get("_via_device")
-        if via_device:
-            self._attr_device_info["via_device"] = via_device
         self._attr_has_entity_name = False  # Use custom name
 
         # Initialize value from coordinator data if available

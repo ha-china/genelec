@@ -172,9 +172,6 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
             "manufacturer": "Genelec",
             "model": "Smart IP",
         }
-        via_device = device_info.get("_via_device")
-        if via_device:
-            self._attr_device_info["via_device"] = via_device
         self._volume = -5.0
         self._is_muted = False
         self._power_state = POWER_STATE_ACTIVE

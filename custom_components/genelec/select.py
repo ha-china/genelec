@@ -147,9 +147,6 @@ class GenelecPowerStateSelect(CoordinatorEntity, SelectEntity):
             "manufacturer": "Genelec",
             "model": "Smart IP",
         }
-        via_device = device_info.get("_via_device")
-        if via_device:
-            self._attr_device_info["via_device"] = via_device
         self._attr_has_entity_name = True
         self._current_option: str | None = POWER_STATE_API_TO_OPTION[POWER_STATE_ACTIVE]
 
@@ -271,9 +268,6 @@ class GenelecProfileSelect(CoordinatorEntity, SelectEntity):
             "manufacturer": "Genelec",
             "model": "Smart IP",
         }
-        via_device = device_info.get("_via_device")
-        if via_device:
-            self._attr_device_info["via_device"] = via_device
         self._attr_has_entity_name = True
         self._attr_options = ["Default (0)"]
         self._option_to_id: dict[str, int] = {"Default (0)": 0}

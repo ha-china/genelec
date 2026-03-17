@@ -28,6 +28,7 @@ from .const import (
     CONF_DEVICE_NAME,
     CONF_ZONE_ID,
     CONF_ZONE_NAME,
+    ATTR_MODEL,
     DEFAULT_API_VERSION,
     DEFAULT_PASSWORD,
     DEFAULT_PORT,
@@ -189,18 +190,22 @@ async def async_setup_entry(hass: HomeAssistant,
 
     if entry_type == ENTRY_TYPE_DEVICE:
         dev_reg = dr.async_get(hass)
-        dev_reg.async_get_or_create(
+        hub_device = dev_reg.async_get_or_create(
             config_entry_id=entry.entry_id,
             identifiers={(DOMAIN, SINGLE_HUB_ID)},
             name=SINGLE_HUB_NAME,
             manufacturer="Genelec",
-            model="Smart IP",
+            model="Smart IP Hub",
         )
-        if data.device_info is None:
-            data.device_info = {}
-        data.device_info["_via_device"] = (DOMAIN, SINGLE_HUB_ID)
-        if getattr(device, "_device_info", None) is not None:
-            device._device_info = data.device_info
+        device_entry = dev_reg.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, device.unique_id)},
+            name=device_display_name,
+            manufacturer="Genelec",
+            model=(data.device_info or {}).get(ATTR_MODEL, "Smart IP"),
+        )
+        if device_entry.via_device_id != hub_device.id:
+            dev_reg.async_update_device(device_entry.id, via_device_id=hub_device.id)
 
     # Create coordinator for centralized updates
     async def async_update_data():

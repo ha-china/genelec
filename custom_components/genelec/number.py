@@ -98,9 +98,6 @@ class GenelecLedIntensityNumber(_LedBase, CoordinatorEntity, NumberEntity):
             "manufacturer": "Genelec",
             "model": "Smart IP",
         }
-        via_device = device_info.get("_via_device")
-        if via_device:
-            self._attr_device_info["via_device"] = via_device
         self._attr_has_entity_name = True
         self._attr_native_value = 100.0
 
