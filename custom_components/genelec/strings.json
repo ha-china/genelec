@@ -47,6 +47,7 @@
     },
     "abort": {
       "already_configured": "This device has already been configured.",
+      "added_to_hub": "Device added to Genelec Devices.",
       "discovery_failed": "Discovery failed.",
       "not_genelec_device": "This is not a Genelec device.",
       "no_ip_address": "No IP address found for the device."

@@ -35,6 +35,8 @@ from .const import (
     DOMAIN,
     LOGGER,
     SCAN_INTERVAL,
+    SINGLE_HUB_ID,
+    SINGLE_HUB_NAME,
     SENSOR_KEYS_AOIP_IDENTITY,
     SENSOR_KEYS_AOIP_IPV4,
     SENSOR_KEYS_EVENTS,
@@ -53,65 +55,61 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Genelec Smart IP sensor entities."""
-    # Get shared data from hass.data
     data = hass.data[DOMAIN].get(entry.entry_id)
-    coordinator = data.coordinator if data else None
 
-    # Use shared device instance
-    device = data.device if data and data.device else None
-    if not device:
-        LOGGER.error("Shared device instance not found")
+    def _build_entities(device_data) -> list[SensorEntity]:
+        coordinator = device_data.coordinator if device_data else None
+        device = device_data.device if device_data and device_data.device else None
+        if not device:
+            return []
+        device_info = device_data.device_info or {}
+        device_id = device_data.device_id or {}
+        network_config = device_data.network_config or {}
+        aoip_ipv4 = device_data.aoip_ipv4 or {}
+        aoip_identity = device_data.aoip_identity or {}
+        zone_info = device_data.zone_info or {}
+        profile_list = device_data.profile_list or {}
+        return [
+            GenelecCPUTemperatureSensor(device, device_info, coordinator),
+            GenelecCPULoadSensor(device, device_info, coordinator),
+            GenelecUptimeSensor(device, device_info, coordinator),
+            GenelecNetworkTrafficSensor(device, device_info, coordinator),
+            GenelecBassLevelSensor(device, device_info, coordinator),
+            GenelecTweeterLevelSensor(device, device_info, coordinator),
+            GenelecInputLevelSensor(device, device_info, coordinator),
+            GenelecFWSensor(device, device_info, coordinator),
+            GenelecModelSensor(device, device_info, coordinator),
+            GenelecMACSensor(device, device_info, coordinator, device_id),
+            GenelecBarcodeSensor(device, device_info, coordinator, device_id),
+            GenelecHWIDSensor(device, device_info, coordinator, device_id),
+            GenelecModelConfigSensor(device, device_info, coordinator, device_id),
+            GenelecBuildSensor(device, device_info, coordinator),
+            GenelecBaseIdSensor(device, device_info, coordinator),
+            GenelecTechnologySensor(device, device_info, coordinator),
+            GenelecUpgradeIdSensor(device, device_info, coordinator),
+            GenelecConfirmFwUpdateSensor(device, device_info, coordinator),
+            GenelecHostIPSensor(device, device_info, coordinator),
+            GenelecReceiverIPSensor(device, device_info, coordinator, aoip_ipv4),
+            GenelecDanteNameSensor(device, device_info, coordinator, aoip_identity),
+            GenelecDanteFriendlyNameSensor(device, device_info, coordinator, aoip_identity),
+            GenelecDanteLockedSensor(device, device_info, coordinator, aoip_identity),
+            GenelecHostnameSensor(device, device_info, coordinator, network_config),
+            GenelecPoeAllocatedPowerSensor(device, device_info, coordinator),
+            GenelecPoePd15WSensor(device, device_info, coordinator),
+            GenelecZoneNameSensor(device, device_info, coordinator, zone_info),
+            GenelecZoneIDSensor(device, device_info, coordinator, zone_info),
+            GenelecCurrentProfileSensor(device, device_info, coordinator, profile_list),
+            GenelecStartupProfileSensor(device, device_info, coordinator, profile_list),
+        ]
+
+    if hasattr(data, "devices"):
+        entities: list[SensorEntity] = []
+        for dev_data in data.devices.values():
+            entities.extend(_build_entities(dev_data))
+        async_add_entities(entities)
         return
 
-    # Get device info from shared data
-    device_info = data.device_info if data else {}
-    device_id = data.device_id if data else {}
-
-    # Get all other data from coordinator for initialization
-    network_config = data.network_config if data else {}
-    aoip_ipv4 = data.aoip_ipv4 if data else {}
-    aoip_identity = data.aoip_identity if data else {}
-    zone_info = data.zone_info if data else {}
-    profile_list = data.profile_list if data else {}
-
-    LOGGER.debug("Initial data - network_config: %s, aoip_ipv4: %s, aoip_identity: %s, zone_info: %s, profile_list: %s",
-                 network_config, aoip_ipv4, aoip_identity, zone_info, profile_list)
-
-    # Create sensors
-    entities = [
-        GenelecCPUTemperatureSensor(device, device_info, coordinator),
-        GenelecCPULoadSensor(device, device_info, coordinator),
-        GenelecUptimeSensor(device, device_info, coordinator),
-        GenelecNetworkTrafficSensor(device, device_info, coordinator),
-        GenelecBassLevelSensor(device, device_info, coordinator),
-        GenelecTweeterLevelSensor(device, device_info, coordinator),
-        GenelecInputLevelSensor(device, device_info, coordinator),
-        GenelecFWSensor(device, device_info, coordinator),
-        GenelecModelSensor(device, device_info, coordinator),
-        GenelecMACSensor(device, device_info, coordinator, device_id),
-        GenelecBarcodeSensor(device, device_info, coordinator, device_id),
-        GenelecHWIDSensor(device, device_info, coordinator, device_id),
-        GenelecModelConfigSensor(device, device_info, coordinator, device_id),
-        GenelecBuildSensor(device, device_info, coordinator),
-        GenelecBaseIdSensor(device, device_info, coordinator),
-        GenelecTechnologySensor(device, device_info, coordinator),
-        GenelecUpgradeIdSensor(device, device_info, coordinator),
-        GenelecConfirmFwUpdateSensor(device, device_info, coordinator),
-        GenelecHostIPSensor(device, device_info, coordinator),
-        GenelecReceiverIPSensor(device, device_info, coordinator, aoip_ipv4),
-        GenelecDanteNameSensor(device, device_info, coordinator, aoip_identity),
-        GenelecDanteFriendlyNameSensor(device, device_info, coordinator, aoip_identity),
-        GenelecDanteLockedSensor(device, device_info, coordinator, aoip_identity),
-        GenelecHostnameSensor(device, device_info, coordinator, network_config),
-        GenelecPoeAllocatedPowerSensor(device, device_info, coordinator),
-        GenelecPoePd15WSensor(device, device_info, coordinator),
-        GenelecZoneNameSensor(device, device_info, coordinator, zone_info),
-        GenelecZoneIDSensor(device, device_info, coordinator, zone_info),
-        GenelecCurrentProfileSensor(device, device_info, coordinator, profile_list),
-        GenelecStartupProfileSensor(device, device_info, coordinator, profile_list),
-    ]
-
-    async_add_entities(entities)
+    async_add_entities(_build_entities(data))
 
 
 class GenelecBaseSensor(CoordinatorEntity, SensorEntity):
@@ -131,7 +129,7 @@ class GenelecBaseSensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"{device.unique_id}_{self._name_suffix}"
         self._attr_name = self._name_suffix
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, device.unique_id)},
+            "identifiers": {(DOMAIN, device_info.get("_device_identifier", device.unique_id))},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",

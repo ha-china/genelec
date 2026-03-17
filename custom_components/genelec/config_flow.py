@@ -19,6 +19,7 @@ from homeassistant.helpers import config_validation as cv
 from .const import (
     CONF_ENTRY_TYPE,
     CONF_API_VERSION,
+    CONF_DEVICES,
     CONF_DEVICE_NAME,
     DEFAULT_API_VERSION,
     DEFAULT_PASSWORD,
@@ -30,6 +31,8 @@ from .const import (
     GENELEC_OUI,
     LOGGER,
     MDNS_SERVICE,
+    SINGLE_HUB_ID,
+    SINGLE_HUB_NAME,
 )
 from .device import GenelecSmartIPDevice
 
@@ -55,6 +58,43 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._discovered_devices: list[dict[str, Any]] = []
         self._zeroconf: AsyncZeroconf | None = None
+
+    def _get_devices_entry(self) -> config_entries.ConfigEntry | None:
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_DEVICE and entry.title == SINGLE_HUB_NAME:
+                return entry
+            if entry.unique_id == SINGLE_HUB_ID:
+                return entry
+        return None
+
+    async def _upsert_device_into_hub(self, payload: dict[str, Any]) -> FlowResult:
+        hub_entry = self._get_devices_entry()
+        unique_id = payload.get("unique_id") or payload.get(CONF_HOST)
+
+        if hub_entry is None:
+            await self.async_set_unique_id(SINGLE_HUB_ID)
+            self._abort_if_unique_id_configured()
+            payload[CONF_ENTRY_TYPE] = ENTRY_TYPE_DEVICE
+            return self.async_create_entry(
+                title=SINGLE_HUB_NAME,
+                data={
+                    CONF_ENTRY_TYPE: ENTRY_TYPE_DEVICE,
+                    CONF_DEVICES: [payload],
+                },
+            )
+
+        devices = list(hub_entry.data.get(CONF_DEVICES, []))
+        for existing in devices:
+            if existing.get("unique_id") == unique_id or existing.get(CONF_HOST) == payload.get(CONF_HOST):
+                return self.async_abort(reason="already_configured")
+
+        devices.append(payload)
+        self.hass.config_entries.async_update_entry(
+            hub_entry,
+            data={**hub_entry.data, CONF_DEVICES: devices},
+        )
+        await self.hass.config_entries.async_reload(hub_entry.entry_id)
+        return self.async_abort(reason="added_to_hub")
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -97,12 +137,15 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         except Exception:
                             pass
 
-                        await self.async_set_unique_id(device.unique_id)
-                        self._abort_if_unique_id_configured()
+                        try:
+                            await device.get_device_id()
+                        except Exception:
+                            pass
+
                         payload = dict(user_input)
                         payload[CONF_DEVICE_NAME] = f"{device_name} [{user_input[CONF_HOST]}]"
-                        payload[CONF_ENTRY_TYPE] = ENTRY_TYPE_DEVICE
-                        return self.async_create_entry(title=payload[CONF_DEVICE_NAME], data=payload)
+                        payload["unique_id"] = device.unique_id
+                        return await self._upsert_device_into_hub(payload)
                     else:
                         errors["base"] = "cannot_connect"
             except Exception:  # pylint: disable=broad-except
@@ -188,13 +231,6 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.error("No IP address found in discovery info")
             return self.async_abort(reason="no_ip_address")
 
-        # Use MAC for unique_id if available, otherwise use host
-        unique_id = f"genelec_{mac.replace(':', '_')}" if mac else f"genelec_{host}"
-        _LOGGER.info("Setting unique_id: %s", unique_id)
-
-        await self.async_set_unique_id(unique_id)
-        self._abort_if_unique_id_configured()
-
         self.context["title_placeholders"] = {
             "name": name,
             "host": host,
@@ -239,6 +275,11 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
 
                     if await device.test_connection():
+                        try:
+                            await device.get_device_id()
+                        except Exception:
+                            pass
+
                         data = {
                             CONF_HOST: device_info[CONF_HOST],
                             CONF_PORT: device_info[CONF_PORT],
@@ -246,9 +287,9 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_PASSWORD: user_input.get(CONF_PASSWORD, DEFAULT_PASSWORD),
                             CONF_API_VERSION: DEFAULT_API_VERSION,
                             CONF_DEVICE_NAME: f"{(device_info.get('name') or 'Genelec Smart IP')} [{device_info[CONF_HOST]}]",
-                            CONF_ENTRY_TYPE: ENTRY_TYPE_DEVICE,
+                            "unique_id": device.unique_id,
                         }
-                        return self.async_create_entry(title=data[CONF_DEVICE_NAME], data=data)
+                        return await self._upsert_device_into_hub(data)
                     else:
                         errors["base"] = "cannot_connect"
             except Exception:  # pylint: disable=broad-except

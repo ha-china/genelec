@@ -25,6 +25,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import (
     CONF_ENTRY_TYPE,
     CONF_API_VERSION,
+    CONF_DEVICES,
     CONF_DEVICE_NAME,
     CONF_ZONE_ID,
     CONF_ZONE_NAME,
@@ -105,6 +106,13 @@ class GenelecSmartIPData:
         self.group_bootstrapped: bool = False
 
 
+class GenelecDevicesHubData:
+    """Container for all single Genelec devices."""
+
+    def __init__(self) -> None:
+        self.devices: dict[str, GenelecSmartIPData] = {}
+
+
 type GenelecSmartIPConfigEntry = ConfigEntry[GenelecSmartIPData]
 
 
@@ -117,7 +125,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant,
-                             entry: GenelecSmartIPConfigEntry) -> bool:
+                              entry: GenelecSmartIPConfigEntry) -> bool:
     """Set up Genelec Smart IP from a config entry."""
     LOGGER.info("Setting up Genelec Smart IP integration")
 
@@ -144,6 +152,11 @@ async def async_setup_entry(hass: HomeAssistant,
         ]
         await hass.config_entries.async_forward_entry_setups(entry, group_platforms)
         return True
+
+    # Devices hub entry: one config entry manages all single Genelec devices.
+    devices_cfg = entry.data.get(CONF_DEVICES, [])
+    if entry_type == ENTRY_TYPE_DEVICE and isinstance(devices_cfg, list):
+        return await _async_setup_devices_hub_entry(hass, entry, devices_cfg)
 
     # Create a shared aiohttp session for this integration entry
     # Device supports max 4 connections, but we only need 1
@@ -188,6 +201,12 @@ async def async_setup_entry(hass: HomeAssistant,
     except Exception as e:
         LOGGER.warning("Failed to get device_info during setup: %s", e)
 
+    # Stable identifier shared between entities and device registry.
+    # Prefer entry.unique_id (MAC-based) when available.
+    if not data.device_info:
+        data.device_info = {"_device_name": entry.data.get(CONF_DEVICE_NAME) or entry.title or device.name}
+    data.device_info["_device_identifier"] = entry.unique_id or device.unique_id
+
     if entry_type == ENTRY_TYPE_DEVICE:
         dev_reg = dr.async_get(hass)
         hub_device = dev_reg.async_get_or_create(
@@ -195,17 +214,23 @@ async def async_setup_entry(hass: HomeAssistant,
             identifiers={(DOMAIN, SINGLE_HUB_ID)},
             name=SINGLE_HUB_NAME,
             manufacturer="Genelec",
-            model="Smart IP Group",
+            model=SINGLE_HUB_NAME,
         )
-        device_entry = dev_reg.async_get_or_create(
+
+        # Hub must always be top-level.
+        if hub_device.via_device_id is not None:
+            dev_reg.async_update_device(hub_device.id, via_device_id=None)
+
+        device_identifier = data.device_info.get("_device_identifier", device.unique_id)
+        speaker_device = dev_reg.async_get_or_create(
             config_entry_id=entry.entry_id,
-            identifiers={(DOMAIN, device.unique_id)},
+            identifiers={(DOMAIN, device_identifier)},
             name=device_display_name,
             manufacturer="Genelec",
             model=(data.device_info or {}).get(ATTR_MODEL, "Smart IP"),
         )
-        if device_entry.via_device_id != hub_device.id:
-            dev_reg.async_update_device(device_entry.id, via_device_id=hub_device.id)
+        if speaker_device.via_device_id != hub_device.id:
+            dev_reg.async_update_device(speaker_device.id, via_device_id=hub_device.id)
 
     # Create coordinator for centralized updates
     async def async_update_data():
@@ -397,12 +422,7 @@ async def async_setup_entry(hass: HomeAssistant,
 
     async def handle_get_api_root(call):
         """Handle API root query service (/public/{version}/)."""
-        entity_ids = call.data.get("entity_id", [])
-        target_entry_ids = await _get_target_entry_ids(entity_ids)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _resolve_target_datas(call.data.get("entity_id", []), call.data.get("device_id", [])):
             try:
                 payload = await target_data.device.get_api_root()
             except aiohttp.ClientResponseError as err:
@@ -483,93 +503,63 @@ async def async_setup_entry(hass: HomeAssistant,
 
         return str(ip_obj), port
 
+    def _iter_device_datas() -> list[GenelecSmartIPData]:
+        return [
+            value for key, value in hass.data.get(DOMAIN, {}).items()
+            if not key.startswith("_") and getattr(value, "device", None)
+        ]
+
+    async def _resolve_target_datas(entity_ids: list[str] | None = None, device_ids: list[str] | None = None) -> list[GenelecSmartIPData]:
+        entity_ids = entity_ids or []
+        device_ids = device_ids or []
+        if not entity_ids and not device_ids:
+            return _iter_device_datas()
+
+        ent_reg = er.async_get(hass)
+        target_device_ids: set[str] = set(device_ids)
+        for entity_id in entity_ids:
+            if reg_entry := ent_reg.async_get(entity_id):
+                if reg_entry.device_id:
+                    target_device_ids.add(reg_entry.device_id)
+
+        resolved: list[GenelecSmartIPData] = []
+        for value in _iter_device_datas():
+            unique_id = (value.device_info or {}).get("_device_identifier")
+            dev_reg = dr.async_get(hass)
+            dev_entry = dev_reg.async_get_device(identifiers={(DOMAIN, unique_id)}) if unique_id else None
+            if dev_entry and dev_entry.id in target_device_ids:
+                resolved.append(value)
+        return resolved
+
     async def handle_wake_up(call):
         """Handle wake up service."""
-        entity_ids = call.data.get("entity_id", [])
-        target_entry_ids = await _get_target_entry_ids(entity_ids)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _resolve_target_datas(call.data.get("entity_id", []), call.data.get("device_id", [])):
             await target_data.device.wake_up()
             await _patch_coordinator(target_data, {"power": {"state": POWER_STATE_ACTIVE}})
 
     async def handle_set_standby(call):
         """Handle set standby service."""
-        entity_ids = call.data.get("entity_id", [])
-        target_entry_ids = await _get_target_entry_ids(entity_ids)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _resolve_target_datas(call.data.get("entity_id", []), call.data.get("device_id", [])):
             await target_data.device.set_standby()
             await _patch_coordinator(target_data, {"power": {"state": POWER_STATE_STANDBY}})
 
     async def handle_boot_device(call):
         """Handle boot device service."""
-        entity_ids = call.data.get("entity_id", [])
-        target_entry_ids = await _get_target_entry_ids(entity_ids)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _resolve_target_datas(call.data.get("entity_id", []), call.data.get("device_id", [])):
             await target_data.device.boot_device()
             await _patch_coordinator(target_data, {"power": {"state": POWER_STATE_BOOT}})
 
-    async def _get_target_entry_ids(entity_ids: list[str]) -> set[str]:
-        """Resolve config entry IDs from entity IDs."""
-        if not entity_ids:
-            return {
-                key for key in hass.data.get(DOMAIN, {})
-                if not key.startswith("_")
-            }
-
-        ent_reg = er.async_get(hass)
-        resolved: set[str] = set()
-        for entity_id in entity_ids:
-            if reg_entry := ent_reg.async_get(entity_id):
-                if reg_entry.config_entry_id:
-                    resolved.add(reg_entry.config_entry_id)
-
-        return resolved or {entry.entry_id}
-
-    async def _get_target_entry_ids_from_call(call) -> set[str]:
-        """Resolve targets from entity IDs and optional zone filters."""
-        entity_ids = call.data.get("entity_id", [])
-        device_ids = call.data.get("device_id", [])
+    async def _get_target_datas_from_call(call) -> list[GenelecSmartIPData]:
+        targets = await _resolve_target_datas(call.data.get("entity_id", []), call.data.get("device_id", []))
         zone_id_raw = call.data.get("zone_id")
         zone_name_raw = call.data.get("zone_name")
-
-        target_entry_ids: set[str] = set()
-        if entity_ids:
-            target_entry_ids = await _get_target_entry_ids(entity_ids)
-        elif device_ids:
-            ent_reg = er.async_get(hass)
-            dev_reg = dr.async_get(hass)
-            for device_id in device_ids:
-                if dev_reg.async_get(device_id) is None:
-                    continue
-                for ent in er.async_entries_for_device(ent_reg, device_id):
-                    if ent.config_entry_id:
-                        target_entry_ids.add(ent.config_entry_id)
-        else:
-            target_entry_ids = {
-                key for key in hass.data.get(DOMAIN, {})
-                if not key.startswith("_")
-            }
-
         if zone_id_raw is None and zone_name_raw is None:
-            return target_entry_ids
+            return targets
 
         zone_id = int(zone_id_raw) if zone_id_raw is not None else None
         zone_name = str(zone_name_raw).strip().lower() if zone_name_raw is not None else None
-        filtered: set[str] = set()
-
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data:
-                continue
-
+        filtered: list[GenelecSmartIPData] = []
+        for target_data in targets:
             zone_info = target_data.zone_info
             if not zone_info and target_data.coordinator and target_data.coordinator.data:
                 zone_info = target_data.coordinator.data.get("zone_info", {})
@@ -579,15 +569,13 @@ async def async_setup_entry(hass: HomeAssistant,
                     target_data.zone_info = zone_info
                 except Exception:
                     zone_info = {}
-
             zone_value = zone_info.get("zone")
             zone_label = str(zone_info.get("name", "")).strip().lower()
             if zone_id is not None and zone_value != zone_id:
                 continue
             if zone_name is not None and zone_label != zone_name:
                 continue
-            filtered.add(target_entry_id)
-
+            filtered.append(target_data)
         return filtered
 
     async def handle_set_volume_level(call):
@@ -603,19 +591,11 @@ async def async_setup_entry(hass: HomeAssistant,
         if level is None:
             return
         level = max(MIN_VOLUME_DB, min(MAX_VOLUME_DB, float(level)))
-        target_entry_ids = await _get_target_entry_ids_from_call(call)
-        if not target_entry_ids:
+        target_datas = await _get_target_datas_from_call(call)
+        if not target_datas:
             LOGGER.warning("set_volume_level did not resolve any target entries")
             return
-        for target_entry_id in target_entry_ids:
-            cfg_entry = hass.config_entries.async_get_entry(target_entry_id)
-            if cfg_entry and cfg_entry.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_DEVICE) == ENTRY_TYPE_GROUP and not has_zone:
-                # Prevent group entry from being adjusted by a single-device call.
-                continue
-
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in target_datas:
 
             # Ensure ACTIVE before applying sensitivity.
             try:
@@ -645,17 +625,11 @@ async def async_setup_entry(hass: HomeAssistant,
 
     async def handle_set_led_intensity(call):
         """Handle set LED intensity service."""
-        entity_ids = call.data.get("entity_id", [])
         intensity = call.data.get("intensity")
         if intensity is None:
             return
         intensity = max(0, min(100, int(intensity)))
-        target_entry_ids = await _get_target_entry_ids(entity_ids)
-
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _resolve_target_datas(call.data.get("entity_id", []), call.data.get("device_id", [])):
             await target_data.device.set_led_settings(led_intensity=intensity)
             await _patch_coordinator(target_data, {"led": {"ledIntensity": intensity}})
 
@@ -670,12 +644,7 @@ async def async_setup_entry(hass: HomeAssistant,
             LOGGER.warning("Invalid profile_id %s, must be 0..5", profile_id)
             return
 
-        entity_ids = call.data.get("entity_id", [])
-        target_entry_ids = await _get_target_entry_ids(entity_ids)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _resolve_target_datas(call.data.get("entity_id", []), call.data.get("device_id", [])):
             await target_data.device.restore_profile(profile_id, startup)
             patch: dict[str, Any] = {"profile_list": {"selected": profile_id}}
             if startup:
@@ -684,7 +653,6 @@ async def async_setup_entry(hass: HomeAssistant,
 
     async def handle_set_network_ipv4(call):
         """Handle writing /network/ipv4 settings."""
-        entity_ids = call.data.get("entity_id", [])
         mode = call.data.get("mode")
         ip_value = call.data.get("ip")
         mask = call.data.get("mask")
@@ -694,11 +662,7 @@ async def async_setup_entry(hass: HomeAssistant,
             LOGGER.warning("mode=static requires ip, mask and gw")
             return
 
-        target_entry_ids = await _get_target_entry_ids(entity_ids)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _resolve_target_datas(call.data.get("entity_id", []), call.data.get("device_id", [])):
 
             await target_data.device.set_network_config(
                 hostname=call.data.get("hostname"),
@@ -729,14 +693,9 @@ async def async_setup_entry(hass: HomeAssistant,
 
     async def handle_multicast_set_volume(call):
         """Handle multicast volume command."""
-        entity_ids = call.data.get("entity_id", [])
         level = float(call.data.get("level"))
         level = max(-130.0, min(0.0, level))
-        target_entry_ids = await _get_target_entry_ids_from_call(call)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _get_target_datas_from_call(call):
             endpoint = await _resolve_multicast_endpoint(target_data)
             if endpoint is None:
                 continue
@@ -746,13 +705,8 @@ async def async_setup_entry(hass: HomeAssistant,
 
     async def handle_multicast_set_mute(call):
         """Handle multicast mute command."""
-        entity_ids = call.data.get("entity_id", [])
         mute = bool(call.data.get("mute", False))
-        target_entry_ids = await _get_target_entry_ids_from_call(call)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _get_target_datas_from_call(call):
             endpoint = await _resolve_multicast_endpoint(target_data)
             if endpoint is None:
                 continue
@@ -762,17 +716,12 @@ async def async_setup_entry(hass: HomeAssistant,
 
     async def handle_multicast_set_profile(call):
         """Handle multicast profile command."""
-        entity_ids = call.data.get("entity_id", [])
         profile_id = int(call.data.get("profile_id"))
         if profile_id < 0 or profile_id > 5:
             LOGGER.warning("Invalid profile_id %s, must be 0..5", profile_id)
             return
 
-        target_entry_ids = await _get_target_entry_ids_from_call(call)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _get_target_datas_from_call(call):
             endpoint = await _resolve_multicast_endpoint(target_data)
             if endpoint is None:
                 continue
@@ -782,17 +731,12 @@ async def async_setup_entry(hass: HomeAssistant,
 
     async def handle_multicast_power(call):
         """Handle multicast power command."""
-        entity_ids = call.data.get("entity_id", [])
         state = str(call.data.get("state", "")).upper()
         if state not in {"STANDBY", "BOOT"}:
             LOGGER.warning("Invalid multicast power state '%s', use STANDBY or BOOT", state)
             return
 
-        target_entry_ids = await _get_target_entry_ids_from_call(call)
-        for target_entry_id in target_entry_ids:
-            target_data = hass.data[DOMAIN].get(target_entry_id)
-            if not target_data or not target_data.device:
-                continue
+        for target_data in await _get_target_datas_from_call(call):
             endpoint = await _resolve_multicast_endpoint(target_data)
             if endpoint is None:
                 continue
@@ -820,6 +764,207 @@ async def async_setup_entry(hass: HomeAssistant,
     return True
 
 
+async def _async_setup_devices_hub_entry(
+    hass: HomeAssistant,
+    entry: GenelecSmartIPConfigEntry,
+    devices_cfg: list[dict[str, Any]],
+) -> bool:
+    """Set up the single top-level Genelec Devices entry."""
+    hass.data.setdefault(DOMAIN, {})
+
+    hub_data = GenelecDevicesHubData()
+    hass.data[DOMAIN][entry.entry_id] = hub_data
+
+    dev_reg = dr.async_get(hass)
+
+    from .device import create_device_from_config_entry
+
+    for raw_cfg in devices_cfg:
+        if not isinstance(raw_cfg, dict):
+            continue
+
+        device_cfg = dict(raw_cfg)
+        device_unique_id = device_cfg.get("unique_id") or device_cfg.get(CONF_HOST)
+        if not isinstance(device_unique_id, str) or not device_unique_id:
+            continue
+
+        connector = aiohttp.TCPConnector(
+            limit=1,
+            limit_per_host=1,
+            force_close=True,
+            enable_cleanup_closed=True,
+            ttl_dns_cache=300,
+        )
+        timeout = aiohttp.ClientTimeout(total=10)
+        session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+
+        data = GenelecSmartIPData()
+        data.session = session
+        hub_data.devices[device_unique_id] = data
+        hass.data[DOMAIN][device_unique_id] = data
+
+        device = create_device_from_config_entry(device_cfg, session=session, lock=data.lock)
+        data.device = device
+
+        try:
+            device_id_data = await device.get_device_id()
+            data.device_id = device_id_data
+            device._device_id = device_id_data
+        except Exception as e:
+            LOGGER.warning("Failed to get device_id during hub setup: %s", e)
+
+        device_display_name = device_cfg.get(CONF_DEVICE_NAME) or device_cfg.get(CONF_HOST) or device.name
+        try:
+            device_info_data = await device.get_device_info()
+            device_info_data["_device_name"] = device_display_name
+            data.device_info = device_info_data
+            device._device_info = device_info_data
+        except Exception as e:
+            LOGGER.warning("Failed to get device_info during hub setup: %s", e)
+            data.device_info = {"_device_name": device_display_name}
+
+        data.device_info["_device_identifier"] = device_unique_id
+
+        speaker_device = dev_reg.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, device_unique_id)},
+            name=device_display_name,
+            manufacturer="Genelec",
+            model=(data.device_info or {}).get(ATTR_MODEL, "Smart IP"),
+        )
+        if speaker_device.via_device_id is not None:
+            dev_reg.async_update_device(speaker_device.id, via_device_id=None)
+
+        async def _make_update(target_data: GenelecSmartIPData, target_device: GenelecSmartIPDevice):
+            async def async_update_data() -> dict[str, Any]:
+                try:
+                    target_data.poll_tick += 1
+                    volume_data = await target_device.get_volume()
+                    power_data = await target_device.get_power_state()
+                    inputs_data = await target_device.get_inputs()
+                    if target_data.poll_tick % 3 == 0 or not target_data.events_data:
+                        events_data = await target_device.get_events()
+                        target_data.events_data = events_data
+                    else:
+                        events_data = target_data.events_data
+
+                    target_data.volume_data = volume_data
+                    target_data.power_data = power_data
+                    target_data.inputs_data = inputs_data
+                    target_data.events_data = events_data
+
+                    if not target_data.network_config:
+                        try:
+                            target_data.network_config = await target_device.get_network_config()
+                        except Exception:
+                            target_data.network_config = {}
+                    if not target_data.aoip_ipv4:
+                        try:
+                            target_data.aoip_ipv4 = await target_device.get_aoip_ipv4()
+                        except Exception:
+                            target_data.aoip_ipv4 = {}
+                    if not target_data.aoip_identity:
+                        try:
+                            target_data.aoip_identity = await target_device.get_aoip_identity()
+                        except Exception:
+                            target_data.aoip_identity = {}
+                    if target_data.poll_tick % 6 == 0 or not target_data.zone_info:
+                        try:
+                            latest_zone = await target_device.get_zone_info()
+                            if isinstance(latest_zone, dict) and latest_zone:
+                                target_data.zone_info = latest_zone
+                        except Exception:
+                            if not target_data.zone_info:
+                                target_data.zone_info = {}
+
+                    zone_id = target_data.zone_info.get("zone")
+                    zone_name = str(target_data.zone_info.get("name", "")).strip()
+                    if (
+                        not target_data.group_bootstrapped
+                        and isinstance(zone_id, int)
+                        and zone_id > 0
+                        and zone_name
+                    ):
+                        await hass.config_entries.flow.async_init(
+                            DOMAIN,
+                            context={"source": "import"},
+                            data={
+                                CONF_ENTRY_TYPE: ENTRY_TYPE_GROUP,
+                                CONF_ZONE_ID: zone_id,
+                                CONF_ZONE_NAME: zone_name,
+                            },
+                        )
+                        target_data.group_bootstrapped = True
+                    if not target_data.profile_list:
+                        try:
+                            target_data.profile_list = await target_device.get_profile_list()
+                        except Exception:
+                            target_data.profile_list = {}
+                    if not target_data.led_initialized:
+                        try:
+                            target_data.led_data = await target_device.get_led_settings()
+                        except Exception:
+                            target_data.led_data = {}
+                        finally:
+                            target_data.led_initialized = True
+
+                    return {
+                        "volume": volume_data,
+                        "power": power_data,
+                        "inputs": inputs_data,
+                        "events": events_data,
+                        "device_info": target_data.device_info,
+                        "device_id": target_data.device_id,
+                        "led": target_data.led_data,
+                        "network_ipv4": target_data.network_config,
+                        "aoip_ipv4": target_data.aoip_ipv4,
+                        "aoip_identity": target_data.aoip_identity,
+                        "zone_info": target_data.zone_info,
+                        "profile_list": target_data.profile_list,
+                    }
+                except Exception as e:
+                    LOGGER.error("Error updating coordinator data: %s", e)
+                    return {
+                        "volume": target_data.volume_data,
+                        "power": target_data.power_data,
+                        "inputs": target_data.inputs_data,
+                        "events": target_data.events_data,
+                        "device_info": target_data.device_info,
+                        "device_id": target_data.device_id,
+                        "led": target_data.led_data,
+                        "network_ipv4": target_data.network_config,
+                        "aoip_ipv4": target_data.aoip_ipv4,
+                        "aoip_identity": target_data.aoip_identity,
+                        "zone_info": target_data.zone_info,
+                        "profile_list": target_data.profile_list,
+                    }
+
+            return async_update_data
+
+        coordinator = DataUpdateCoordinator(
+            hass,
+            LOGGER,
+            name=f"{DOMAIN}_{device_unique_id}",
+            update_method=await _make_update(data, device),
+            update_interval=timedelta(seconds=60),
+        )
+        data.coordinator = coordinator
+        await coordinator.async_config_entry_first_refresh()
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Remove the old hub device if it exists; the config entry itself is now the
+    # top-level Genelec Devices container and no extra child device is needed.
+    stale_hub = dev_reg.async_get_device(identifiers={(DOMAIN, SINGLE_HUB_ID)})
+    if stale_hub is not None:
+        try:
+            dev_reg.async_remove_device(stale_hub.id)
+        except Exception:
+            LOGGER.debug("Failed to remove stale Genelec Devices device", exc_info=True)
+
+    return True
+
+
 async def async_unload_entry(hass: HomeAssistant,
                              entry: GenelecSmartIPConfigEntry) -> bool:
     """Unload a config entry."""
@@ -834,7 +979,12 @@ async def async_unload_entry(hass: HomeAssistant,
 
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, unload_platforms):
         data = hass.data[DOMAIN].pop(entry.entry_id, None)
-        if data and hasattr(data, 'session') and data.session:
+        if isinstance(data, GenelecDevicesHubData):
+            for unique_id, dev_data in data.devices.items():
+                hass.data[DOMAIN].pop(unique_id, None)
+                if dev_data.session:
+                    await dev_data.session.close()
+        elif data and hasattr(data, 'session') and data.session:
             await data.session.close()
 
         remaining_entries = [

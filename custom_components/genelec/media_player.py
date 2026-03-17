@@ -40,6 +40,7 @@ from .const import (
     MIN_VOLUME_DB,
     POWER_STATE_ACTIVE,
     POWER_STATE_STANDBY,
+    SINGLE_HUB_ID,
 )
 from .device import GenelecSmartIPDevice
 
@@ -80,31 +81,13 @@ async def async_setup_entry(
     """Set up Genelec Smart IP media player entities."""
     # Get shared data from hass.data
     data = hass.data[DOMAIN].get(entry.entry_id)
-    coordinator = data.coordinator if data else None
+    coordinator = getattr(data, "coordinator", None) if data else None
     entry_type = entry.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_DEVICE)
 
     if entry_type == ENTRY_TYPE_GROUP:
         zones: dict[int, tuple[str, int]] = {}
-        for device_entry in hass.config_entries.async_entries(DOMAIN):
-            if device_entry.entry_id == entry.entry_id:
-                continue
-            if device_entry.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_DEVICE) != ENTRY_TYPE_DEVICE:
-                continue
-
-            zone_id = device_entry.data.get(CONF_ZONE_ID)
-            zone_name = str(device_entry.data.get(CONF_ZONE_NAME, "")).strip()
-            try:
-                zone_id = int(zone_id)
-            except (TypeError, ValueError):
-                zone_id = None
-
-            if zone_id and zone_name:
-                prev_name, prev_count = zones.get(zone_id, (zone_name, 0))
-                zones[zone_id] = (prev_name, prev_count + 1)
-                continue
-
-            data_item = hass.data.get(DOMAIN, {}).get(device_entry.entry_id)
-            if not data_item:
+        for key, data_item in hass.data.get(DOMAIN, {}).items():
+            if key.startswith("_") or not getattr(data_item, "device", None):
                 continue
             zone_info = getattr(data_item, "zone_info", {}) or {}
             if not zone_info and getattr(data_item, "coordinator", None) and data_item.coordinator.data:
@@ -123,6 +106,15 @@ async def async_setup_entry(
             GenelecZoneMediaPlayer(hass, zone_id, zone_name)
             for zone_id, (zone_name, member_count) in sorted(zones.items())
         ])
+        return
+
+    if hasattr(data, "devices"):
+        entities = [
+            GenelecSmartIPMediaPlayer(dev_data.device, dev_data.device_info or {}, dev_data.coordinator)
+            for dev_data in data.devices.values()
+            if getattr(dev_data, "device", None)
+        ]
+        async_add_entities(entities)
         return
 
     # Use shared device instance
@@ -167,7 +159,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         self._attr_name = "Speaker"
         self._attr_unique_id = device.unique_id
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, device.unique_id)},
+            "identifiers": {(DOMAIN, device_info.get("_device_identifier", device.unique_id))},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",

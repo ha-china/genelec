@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 if TYPE_CHECKING:
     from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN, LOGGER
+from .const import DOMAIN, LOGGER, SINGLE_HUB_ID
 from .device import GenelecSmartIPDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,25 +26,30 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Genelec Smart IP switch entities."""
-    # Get shared data from hass.data
     data = hass.data[DOMAIN].get(entry.entry_id)
-    coordinator = data.coordinator if data else None
 
-    # Use shared device instance
+    if hasattr(data, "devices"):
+        entities: list[SwitchEntity] = []
+        for dev_data in data.devices.values():
+            if not getattr(dev_data, "device", None):
+                continue
+            entities.extend([
+                GenelecRJ45LedsSwitch(dev_data.device, dev_data.device_info or {}, dev_data.coordinator),
+                GenelecClipLedSwitch(dev_data.device, dev_data.device_info or {}, dev_data.coordinator),
+            ])
+        async_add_entities(entities)
+        return
+
+    coordinator = data.coordinator if data else None
     device = data.device if data and data.device else None
     if not device:
         _LOGGER.error("Shared device instance not found")
         return
-
-    # Get device info from shared data
     device_info = data.device_info if data else {}
-
-    entities = [
+    async_add_entities([
         GenelecRJ45LedsSwitch(device, device_info, coordinator),
         GenelecClipLedSwitch(device, device_info, coordinator),
-    ]
-
-    async_add_entities(entities)
+    ])
 
 
 class GenelecRJ45LedsSwitch(CoordinatorEntity, SwitchEntity):
@@ -65,7 +70,7 @@ class GenelecRJ45LedsSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_name = "RJ45 LEDs"
         self._attr_unique_id = f"{device.unique_id}_rj45_leds"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, device.unique_id)},
+            "identifiers": {(DOMAIN, device_info.get("_device_identifier", device.unique_id))},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",
@@ -152,7 +157,7 @@ class GenelecClipLedSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_name = "Clip LED"
         self._attr_unique_id = f"{device.unique_id}_clip_led"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, device.unique_id)},
+            "identifiers": {(DOMAIN, device_info.get("_device_identifier", device.unique_id))},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",

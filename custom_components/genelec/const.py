@@ -23,6 +23,7 @@ CONF_ENTRY_TYPE = "entry_type"
 CONF_ZONE_ID = "zone_id"
 CONF_ZONE_NAME = "zone_name"
 CONF_DEVICE_NAME = "device_name"
+CONF_DEVICES = "devices"
 
 ENTRY_TYPE_DEVICE = "device"
 ENTRY_TYPE_GROUP = "group"
