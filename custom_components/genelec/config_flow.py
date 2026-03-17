@@ -67,6 +67,17 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return entry
         return None
 
+    def _hub_has_device(self, unique_id: str | None, host: str | None) -> bool:
+        hub_entry = self._get_devices_entry()
+        if hub_entry is None:
+            return False
+        for existing in list(hub_entry.data.get(CONF_DEVICES, [])):
+            if unique_id and existing.get("unique_id") == unique_id:
+                return True
+            if host and existing.get(CONF_HOST) == host:
+                return True
+        return False
+
     async def _upsert_device_into_hub(self, payload: dict[str, Any]) -> FlowResult:
         hub_entry = self._get_devices_entry()
         unique_id = payload.get("unique_id") or payload.get(CONF_HOST)
@@ -230,6 +241,13 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if host is None:
             _LOGGER.error("No IP address found in discovery info")
             return self.async_abort(reason="no_ip_address")
+
+        unique_id = f"genelec_{mac.replace(':', '_')}" if mac else f"genelec_{host}"
+        if self._hub_has_device(unique_id, host):
+            return self.async_abort(reason="already_configured")
+
+        await self.async_set_unique_id(unique_id)
+        self._abort_if_unique_id_configured()
 
         self.context["title_placeholders"] = {
             "name": name,
