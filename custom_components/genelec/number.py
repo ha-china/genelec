@@ -21,6 +21,22 @@ from .const import (
 )
 
 
+def _iter_zone_sources(hass: HomeAssistant) -> list[Any]:
+    """Return all real device data objects for zone aggregation."""
+    sources: list[Any] = []
+    for key, value in hass.data.get(DOMAIN, {}).items():
+        if key.startswith("_"):
+            continue
+        if hasattr(value, "devices"):
+            sources.extend(
+                dev_data for dev_data in value.devices.values() if getattr(dev_data, "device", None)
+            )
+            continue
+        if getattr(value, "device", None):
+            sources.append(value)
+    return sources
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -33,9 +49,7 @@ async def async_setup_entry(
 
     if entry_type == ENTRY_TYPE_GROUP:
         zones: dict[int, tuple[str, int]] = {}
-        for key, data_item in hass.data.get(DOMAIN, {}).items():
-            if key.startswith("_") or not getattr(data_item, "device", None):
-                continue
+        for data_item in _iter_zone_sources(hass):
             zone_info = getattr(data_item, "zone_info", {}) or {}
             if not zone_info and getattr(data_item, "coordinator", None) and data_item.coordinator.data:
                 zone_info = data_item.coordinator.data.get("zone_info", {}) or {}

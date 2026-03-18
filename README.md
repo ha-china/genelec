@@ -1,7 +1,7 @@
 # Genelec Smart IP
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
-[![GitHub release](https://img.shields.io/github/release/ha-china/genele.svg)](https://github.com/ha-china/genele/releases)
+[![GitHub release](https://img.shields.io/github/release/ha-china/genelec.svg)](https://github.com/ha-china/genelec/releases)
 [![License](https://img.shields.io/github/license/ha-china/genele.svg)](LICENSE)
 
 A custom integration for Home Assistant to control Genelec Smart IP series studio monitors.

@@ -6,14 +6,14 @@
     ],
     "config_flow": true,
     "dependencies": [],
-    "documentation": "https://github.com/ha-china/genele",
+    "documentation": "https://github.com/ha-china/genelec",
     "integration_type": "device",
     "iot_class": "local_polling",
-    "issue_tracker": "https://github.com/ha-china/genele/issues",
+    "issue_tracker": "https://github.com/ha-china/genelec/issues",
     "requirements": [
         "zeroconf>=0.132.0"
     ],
-    "version": "0.3.12",
+    "version": "0.3.13",
     "zeroconf": [
         "_smart_ip._tcp.local."
     ]
