@@ -10,6 +10,8 @@ A custom integration for Home Assistant to control Genelec Smart IP series studi
 
 ### Via HACS (Recommended)
 
+[![Open your Home Assistant instance and open the add repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ha-china&repository=genelec&category=integration)
+
 1. Open HACS
 2. Go to "Integrations"
 3. Click the "+" button in the top right corner
