@@ -318,6 +318,17 @@ async def async_setup_entry(hass: HomeAssistant,
 
             # These endpoints may not exist on all device models
             # 404 errors are expected for devices without these features
+            if data.poll_tick % 2 == 0 or not data.zone_info:
+                try:
+                    latest_zone = await device.get_zone_info()
+                    if isinstance(latest_zone, dict) and latest_zone:
+                        data.zone_info = latest_zone
+                    LOGGER.debug("Zone info: %s", data.zone_info)
+                except Exception as e:
+                    LOGGER.debug("Zone info not available: %s", e)
+                    if not data.zone_info:
+                        data.zone_info = {}
+
             if not data.network_config:
                 try:
                     data.network_config = await device.get_network_config()
@@ -342,16 +353,6 @@ async def async_setup_entry(hass: HomeAssistant,
                     # 404 is expected for devices without AoIP/Dante module
                     LOGGER.debug("AoIP identity not available (device may not have Dante): %s", e)
                     data.aoip_identity = {}  # Set empty dict to prevent repeated attempts
-            if data.poll_tick % 6 == 0 or not data.zone_info:
-                try:
-                    latest_zone = await device.get_zone_info()
-                    if isinstance(latest_zone, dict) and latest_zone:
-                        data.zone_info = latest_zone
-                    LOGGER.debug("Zone info: %s", data.zone_info)
-                except Exception as e:
-                    LOGGER.debug("Zone info not available: %s", e)
-                    if not data.zone_info:
-                        data.zone_info = {}
 
             if entry_type == ENTRY_TYPE_DEVICE and data.zone_info:
                 zone_id = data.zone_info.get("zone")
@@ -891,6 +892,15 @@ async def _async_setup_devices_hub_entry(
                     target_data.inputs_data = inputs_data
                     target_data.events_data = events_data
 
+                    if target_data.poll_tick % 2 == 0 or not target_data.zone_info:
+                        try:
+                            latest_zone = await target_device.get_zone_info()
+                            if isinstance(latest_zone, dict) and latest_zone:
+                                target_data.zone_info = latest_zone
+                        except Exception:
+                            if not target_data.zone_info:
+                                target_data.zone_info = {}
+
                     if not target_data.network_config:
                         try:
                             target_data.network_config = await target_device.get_network_config()
@@ -906,14 +916,6 @@ async def _async_setup_devices_hub_entry(
                             target_data.aoip_identity = await target_device.get_aoip_identity()
                         except Exception:
                             target_data.aoip_identity = {}
-                    if target_data.poll_tick % 6 == 0 or not target_data.zone_info:
-                        try:
-                            latest_zone = await target_device.get_zone_info()
-                            if isinstance(latest_zone, dict) and latest_zone:
-                                target_data.zone_info = latest_zone
-                        except Exception:
-                            if not target_data.zone_info:
-                                target_data.zone_info = {}
 
                     zone_id = target_data.zone_info.get("zone")
                     zone_name = str(target_data.zone_info.get("name", "")).strip()
