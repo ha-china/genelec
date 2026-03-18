@@ -113,6 +113,44 @@ class GenelecDevicesHubData:
         self.devices: dict[str, GenelecSmartIPData] = {}
 
 
+def _get_persisted_devices(entry: GenelecSmartIPConfigEntry) -> list[dict[str, Any]]:
+    """Return persisted single-device payloads from the hub entry."""
+    devices_cfg = entry.data.get(CONF_DEVICES, [])
+    return list(devices_cfg) if isinstance(devices_cfg, list) else []
+
+
+def _update_persisted_device_zone(
+    hass: HomeAssistant,
+    entry: GenelecSmartIPConfigEntry,
+    device_unique_id: str,
+    zone_id: int,
+    zone_name: str,
+) -> bool:
+    """Persist per-device zone info into the Genelec Devices entry."""
+    devices = _get_persisted_devices(entry)
+    changed = False
+    for idx, device_payload in enumerate(devices):
+        if not isinstance(device_payload, dict):
+            continue
+        payload_unique_id = device_payload.get("unique_id") or device_payload.get(CONF_HOST)
+        if payload_unique_id != device_unique_id:
+            continue
+        if device_payload.get(CONF_ZONE_ID) == zone_id and device_payload.get(CONF_ZONE_NAME) == zone_name:
+            return False
+        updated = dict(device_payload)
+        updated[CONF_ZONE_ID] = zone_id
+        updated[CONF_ZONE_NAME] = zone_name
+        devices[idx] = updated
+        changed = True
+        break
+    if changed:
+        hass.config_entries.async_update_entry(
+            entry,
+            data={**entry.data, CONF_DEVICES: devices},
+        )
+    return changed
+
+
 type GenelecSmartIPConfigEntry = ConfigEntry[GenelecSmartIPData]
 
 
@@ -879,6 +917,17 @@ async def _async_setup_devices_hub_entry(
 
                     zone_id = target_data.zone_info.get("zone")
                     zone_name = str(target_data.zone_info.get("name", "")).strip()
+                    if isinstance(zone_id, int) and zone_id > 0 and zone_name:
+                        zone_changed = _update_persisted_device_zone(
+                            hass,
+                            entry,
+                            device_unique_id,
+                            zone_id,
+                            zone_name,
+                        )
+                    else:
+                        zone_changed = False
+
                     if (
                         not target_data.group_bootstrapped
                         and isinstance(zone_id, int)
@@ -895,6 +944,10 @@ async def _async_setup_devices_hub_entry(
                             },
                         )
                         target_data.group_bootstrapped = True
+                    elif zone_changed:
+                        for cfg_entry in hass.config_entries.async_entries(DOMAIN):
+                            if cfg_entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_GROUP:
+                                await hass.config_entries.async_reload(cfg_entry.entry_id)
                     if not target_data.profile_list:
                         try:
                             target_data.profile_list = await target_device.get_profile_list()

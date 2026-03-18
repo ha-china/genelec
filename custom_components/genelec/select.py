@@ -84,7 +84,29 @@ async def async_setup_entry(
     if entry_type == ENTRY_TYPE_GROUP:
         zones: dict[int, tuple[str, int]] = {}
         for data_item in _iter_zone_sources(hass):
+            device_info = getattr(data_item, "device_info", {}) or {}
+            device_identifier = device_info.get("_device_identifier")
+            persisted_zone: dict[str, Any] = {}
+            for cfg_entry in hass.config_entries.async_entries(DOMAIN):
+                devices_cfg = cfg_entry.data.get("devices", [])
+                if not isinstance(devices_cfg, list):
+                    continue
+                for device_payload in devices_cfg:
+                    if not isinstance(device_payload, dict):
+                        continue
+                    payload_unique_id = device_payload.get("unique_id") or device_payload.get(CONF_HOST)
+                    if payload_unique_id == device_identifier:
+                        persisted_zone = {
+                            "zone": device_payload.get(CONF_ZONE_ID),
+                            "name": device_payload.get(CONF_ZONE_NAME),
+                        }
+                        break
+                if persisted_zone:
+                    break
+
             zone_info = getattr(data_item, "zone_info", {}) or {}
+            if not zone_info and persisted_zone:
+                zone_info = persisted_zone
             if not zone_info and getattr(data_item, "coordinator", None) and data_item.coordinator.data:
                 zone_info = data_item.coordinator.data.get("zone_info", {}) or {}
             try:
