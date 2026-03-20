@@ -482,6 +482,7 @@ async def async_setup_entry(hass: HomeAssistant,
         name=DOMAIN,
         update_method=async_update_data,
         update_interval=timedelta(seconds=60),
+        config_entry=entry,
     )
 
     data.coordinator = coordinator
@@ -1002,6 +1003,7 @@ async def _async_setup_devices_hub_entry(
             name=f"{DOMAIN}_{device_unique_id}",
             update_method=await _make_update(data, device),
             update_interval=timedelta(seconds=60),
+            config_entry=entry,
         )
         data.coordinator = coordinator
         await coordinator.async_config_entry_first_refresh()
