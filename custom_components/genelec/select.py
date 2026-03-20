@@ -53,6 +53,28 @@ def _iter_zone_sources(hass: HomeAssistant) -> list[Any]:
             sources.append(value)
     return sources
 
+
+def _iter_persisted_zones(hass: HomeAssistant) -> dict[int, tuple[str, int]]:
+    """Return persisted zone info from Genelec Devices records."""
+    zones: dict[int, tuple[str, int]] = {}
+    for cfg_entry in hass.config_entries.async_entries(DOMAIN):
+        devices_cfg = cfg_entry.data.get("devices", [])
+        if not isinstance(devices_cfg, list):
+            continue
+        for device_payload in devices_cfg:
+            if not isinstance(device_payload, dict):
+                continue
+            try:
+                zone_id = int(device_payload.get(CONF_ZONE_ID))
+            except (TypeError, ValueError):
+                continue
+            if zone_id <= 0:
+                continue
+            zone_name = str(device_payload.get(CONF_ZONE_NAME) or f"Zone {zone_id}").strip()
+            prev_name, prev_count = zones.get(zone_id, (zone_name, 0))
+            zones[zone_id] = (prev_name, prev_count + 1)
+    return zones
+
 POWER_STATE_API_TO_OPTION = {
     POWER_STATE_ACTIVE: "active",
     POWER_STATE_STANDBY: "standby",
@@ -82,31 +104,9 @@ async def async_setup_entry(
     entry_type = entry.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_DEVICE)
 
     if entry_type == ENTRY_TYPE_GROUP:
-        zones: dict[int, tuple[str, int]] = {}
+        zones: dict[int, tuple[str, int]] = _iter_persisted_zones(hass)
         for data_item in _iter_zone_sources(hass):
-            device_info = getattr(data_item, "device_info", {}) or {}
-            device_identifier = device_info.get("_device_identifier")
-            persisted_zone: dict[str, Any] = {}
-            for cfg_entry in hass.config_entries.async_entries(DOMAIN):
-                devices_cfg = cfg_entry.data.get("devices", [])
-                if not isinstance(devices_cfg, list):
-                    continue
-                for device_payload in devices_cfg:
-                    if not isinstance(device_payload, dict):
-                        continue
-                    payload_unique_id = device_payload.get("unique_id") or device_payload.get(CONF_HOST)
-                    if payload_unique_id == device_identifier:
-                        persisted_zone = {
-                            "zone": device_payload.get(CONF_ZONE_ID),
-                            "name": device_payload.get(CONF_ZONE_NAME),
-                        }
-                        break
-                if persisted_zone:
-                    break
-
             zone_info = getattr(data_item, "zone_info", {}) or {}
-            if not zone_info and persisted_zone:
-                zone_info = persisted_zone
             if not zone_info and getattr(data_item, "coordinator", None) and data_item.coordinator.data:
                 zone_info = data_item.coordinator.data.get("zone_info", {}) or {}
             try:

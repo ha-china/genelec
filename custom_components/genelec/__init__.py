@@ -819,14 +819,14 @@ async def _async_setup_devices_hub_entry(
 
     from .device import create_device_from_config_entry
 
-    for raw_cfg in devices_cfg:
+    async def _setup_one_device(raw_cfg: dict[str, Any]) -> None:
         if not isinstance(raw_cfg, dict):
-            continue
+            return
 
         device_cfg = dict(raw_cfg)
         device_unique_id = device_cfg.get("unique_id") or device_cfg.get(CONF_HOST)
         if not isinstance(device_unique_id, str) or not device_unique_id:
-            continue
+            return
 
         connector = aiohttp.TCPConnector(
             limit=1,
@@ -1007,6 +1007,11 @@ async def _async_setup_devices_hub_entry(
         )
         data.coordinator = coordinator
         await coordinator.async_config_entry_first_refresh()
+
+    await asyncio.gather(
+        *[_setup_one_device(raw_cfg) for raw_cfg in devices_cfg if isinstance(raw_cfg, dict)],
+        return_exceptions=False,
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
