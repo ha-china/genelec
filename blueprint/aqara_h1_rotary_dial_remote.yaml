@@ -78,8 +78,19 @@ blueprint:
           step: 0.001
           mode: slider
       default: 0.004
+    rotate_db_divisor:
+      name: dB Divisor
+      description: If the target player exposes volume_db, use rotation_angle_delta divided by this value as the dB step.
+      selector:
+        number:
+          min: 1
+          max: 20
+          step: 1
+          mode: slider
+      default: 2
 
-mode: restart
+mode: queued
+max: 100
 max_exceeded: silent
 
 trigger:
@@ -93,6 +104,7 @@ action:
       dynamic_volume: !input rotate_dynamic_volume
       volume_player: !input rotate_volume_player
       volume_per_degree: !input rotate_volume_per_degree
+      rotate_db_divisor: !input rotate_db_divisor
   - choose:
       # Single press on the button
       - conditions:
@@ -119,7 +131,7 @@ action:
               {{
                 dynamic_volume
                 and volume_player | string | length > 0
-                and trigger.event.data.command in ["start_rotation", "rotation"]
+                and trigger.event.data.command == "rotation"
                 and trigger.event.data.args.rotation_angle_delta is defined
               }}
         sequence:
@@ -127,10 +139,19 @@ action:
             data:
               entity_id: "{{ volume_player }}"
               volume_level: >-
-                {% set current = state_attr(volume_player, "volume_level") | float(0) %}
                 {% set delta = trigger.event.data.args.rotation_angle_delta | float(0) %}
-                {% set raw = current + (delta * (volume_per_degree | float(0.004))) %}
-                {{ [0, [1, raw] | min] | max }}
+                {% set current_db = state_attr(volume_player, "volume_db") %}
+                {% if current_db is not none %}
+                  {% set min_db = -130.0 %}
+                  {% set max_db = 0.0 %}
+                  {% set raw_db = (current_db | float(0)) + (delta / (rotate_db_divisor | float(2))) %}
+                  {% set clamped_db = [max_db, [min_db, raw_db] | max] | min %}
+                  {{ ((clamped_db - min_db) / (max_db - min_db)) | round(3) }}
+                {% else %}
+                  {% set current = state_attr(volume_player, "volume_level") | float(0) %}
+                  {% set raw = current + (delta * (volume_per_degree | float(0.004))) %}
+                  {{ ([0, [1, raw] | min] | max) | round(3) }}
+                {% endif %}
 
       # Rotate dial to the left
       - conditions:
