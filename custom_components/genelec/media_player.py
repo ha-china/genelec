@@ -426,6 +426,14 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         return max(0.0, min(1.0, (self._volume - MIN_VOLUME_DB) / span))
 
     @property
+    def volume_step(self) -> float | None:
+        """Expose 1 dB step size to Home Assistant UI."""
+        span = MAX_VOLUME_DB - MIN_VOLUME_DB
+        if span <= 0:
+            return None
+        return 1.0 / span
+
+    @property
     def is_volume_muted(self) -> bool:
         """Boolean if volume is currently muted."""
         return self._is_muted
@@ -745,6 +753,13 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         if span <= 0:
             return 0.0
         return max(0.0, min(1.0, (self._volume - MIN_VOLUME_DB) / span))
+
+    @property
+    def volume_step(self) -> float | None:
+        span = MAX_VOLUME_DB - MIN_VOLUME_DB
+        if span <= 0:
+            return None
+        return 1.0 / span
 
     @property
     def is_volume_muted(self) -> bool:
