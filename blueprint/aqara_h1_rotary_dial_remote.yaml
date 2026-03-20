@@ -1,0 +1,149 @@
+# This blueprint allows you to map actions to the different controls on an Aqara H1 Rotary Dial (https://homekitnews.com/2020/11/02/aqara-reveal-smart-rotary-dimmer-switch/)
+#
+# This ZigBee device is not currently supported by ZHA, and requires a custom ZHA quirk: https://gist.github.com/oxc/754d6436ce62d92af660d3671acd9346
+# This ZigBee device is already supported by Z2M: https://github.com/zigpy/zha-device-handlers/issues/2266
+#
+# This automation is built for a device in EVENT mode rather than COMMAND mode. As there is some cross-over between the two modes, it is NOT recommended to use automations for both modes at the same time.
+
+blueprint:
+  name: Aqara H1 Rotary Dial - Remote (Event Mode)
+
+  source_url: https://raw.githubusercontent.com/nwithan8/configs/main/home_assistant/blueprints/automations/aqara_h1_rotary_dial_remote.yaml
+
+  description: >-
+    This automation allows using an Aqara H1 Rotary Dial (ZigBee) to trigger actions.
+    Requires a custom quirk if using with ZHA.
+
+  domain: automation
+
+  input:
+    dial:
+      name: Aqara H1 Rotary Dial
+      description: Select the rotary dial you wish to use
+      selector:
+        device:
+          integration: zha
+          manufacturer: LUMI
+          model: lumi.remote.rkba01
+    single:
+      name: Single Press
+      description: The action to perform on a single press of the dial button
+      selector:
+        action:
+      default: []
+    double:
+      name: Double Press
+      description: The action to perform on a double press of the dial button
+      selector:
+        action:
+      default: []
+    long:
+      name: Long Press
+      description: The action to perform on a long press of the dial button
+      selector:
+        action:
+      default: []
+    left:
+      name: Left Turn
+      description: The action to perform on rotating the dial to the left
+      selector:
+        action:
+      default: []
+    right:
+      name: Right Turn
+      description: The action to perform on rotating the dial to the right
+      selector:
+        action:
+      default: []
+    rotate_dynamic_volume:
+      name: Dynamic Rotate Volume
+      description: Enable real-time volume tracking from rotation angle delta
+      selector:
+        boolean:
+      default: false
+    rotate_volume_player:
+      name: Volume Media Player
+      description: Media player to control when Dynamic Rotate Volume is enabled
+      selector:
+        entity:
+          domain: media_player
+      default: ""
+    rotate_volume_per_degree:
+      name: Volume per Degree
+      description: Volume change per 1 degree of rotation (e.g. 0.004)
+      selector:
+        number:
+          min: 0.001
+          max: 0.03
+          step: 0.001
+          mode: slider
+      default: 0.004
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_id: !input dial
+
+action:
+  - variables:
+      dynamic_volume: !input rotate_dynamic_volume
+      volume_player: !input rotate_volume_player
+      volume_per_degree: !input rotate_volume_per_degree
+  - choose:
+      # Single press on the button
+      - conditions:
+          - condition: template
+            value_template: '{{ trigger.event.data.command == "1_single" }}'
+        sequence: !input single
+
+      # Double press on the button
+      - conditions:
+          - condition: template
+            value_template: '{{ trigger.event.data.command == "1_double" }}'
+        sequence: !input double
+
+      # Long press on the button
+      - conditions:
+          - condition: template
+            value_template: '{{ trigger.event.data.command == "1_hold" }}'
+        sequence: !input long
+
+      # Rotate dial and set media volume continuously using rotation angle delta
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{
+                dynamic_volume
+                and volume_player | string | length > 0
+                and trigger.event.data.command in ["start_rotation", "rotation"]
+                and trigger.event.data.args.rotation_angle_delta is defined
+              }}
+        sequence:
+          - service: media_player.volume_set
+            target:
+              entity_id: !input rotate_volume_player
+            data:
+              volume_level: >-
+                {% set current = state_attr(volume_player, "volume_level") | float(0) %}
+                {% set delta = trigger.event.data.args.rotation_angle_delta | float(0) %}
+                {% set raw = current + (delta * (volume_per_degree | float(0.004))) %}
+                {{ [0, [1, raw] | min] | max }}
+
+      # Rotate dial to the left
+      - conditions:
+          - condition: template
+            value_template: '{{ trigger.event.data.command == "stop_rotation" and trigger.event.data.args.rotation_direction == -1 }}'
+        sequence: !input left
+
+      # Rotate dial to the right
+      - conditions:
+          - condition: template
+            value_template: '{{ trigger.event.data.command == "stop_rotation" and trigger.event.data.args.rotation_direction == 1 }}'
+        sequence: !input right
+
+    # Any other event will cancel the repeat loops.
+    default: []
