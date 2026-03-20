@@ -124,9 +124,8 @@ action:
               }}
         sequence:
           - service: media_player.volume_set
-            target:
-              entity_id: !input rotate_volume_player
             data:
+              entity_id: "{{ volume_player }}"
               volume_level: >-
                 {% set current = state_attr(volume_player, "volume_level") | float(0) %}
                 {% set delta = trigger.event.data.args.rotation_angle_delta | float(0) %}
