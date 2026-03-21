@@ -4,13 +4,13 @@
       "user": {
         "title": "Add Genelec Smart IP",
         "menu_options": {
-          "device": "Single Device Control",
+          "device": "Genelec Devices",
           "group": "Zone Group Control"
         }
       },
       "device": {
-        "title": "Connect to Genelec Smart IP",
-        "description": "Enter your Genelec Smart IP device details.",
+        "title": "Add Genelec Device",
+        "description": "Add a speaker under the Genelec Devices container.",
         "data": {
           "host": "Host",
           "port": "Port",

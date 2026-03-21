@@ -107,6 +107,25 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         await self.hass.config_entries.async_reload(hub_entry.entry_id)
         return self.async_abort(reason="added_to_hub")
 
+    async def _ensure_devices_hub(self) -> config_entries.ConfigEntry | None:
+        """Create the Genelec Devices entry if it does not exist."""
+        hub_entry = self._get_devices_entry()
+        if hub_entry is not None:
+            return hub_entry
+
+        result = await self.hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": "user"},
+            data={
+                CONF_ENTRY_TYPE: ENTRY_TYPE_DEVICE,
+                CONF_DEVICES: [],
+            },
+        )
+
+        if result.get("type") == "create_entry":
+            return self._get_devices_entry()
+        return self._get_devices_entry()
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -121,6 +140,9 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Configure a single device entry."""
         errors: dict[str, str] = {}
+
+        if user_input is None:
+            await self._ensure_devices_hub()
 
         if user_input is not None:
             try:
@@ -185,6 +207,21 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_import(self, user_input: dict[str, Any]) -> FlowResult:
         """Handle import-style creation for group entries."""
         entry_type = user_input.get(CONF_ENTRY_TYPE)
+        if entry_type == ENTRY_TYPE_DEVICE:
+            hub_entry = self._get_devices_entry()
+            if hub_entry is not None:
+                return self.async_abort(reason="already_configured")
+
+            await self.async_set_unique_id(SINGLE_HUB_ID)
+            self._abort_if_unique_id_configured()
+            return self.async_create_entry(
+                title=SINGLE_HUB_NAME,
+                data={
+                    CONF_ENTRY_TYPE: ENTRY_TYPE_DEVICE,
+                    CONF_DEVICES: list(user_input.get(CONF_DEVICES, [])),
+                },
+            )
+
         if entry_type != ENTRY_TYPE_GROUP:
             return self.async_abort(reason="discovery_failed")
 
