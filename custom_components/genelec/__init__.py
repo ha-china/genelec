@@ -151,6 +151,36 @@ def _update_persisted_device_zone(
     return changed
 
 
+async def _ensure_group_entry_exists(
+    hass: HomeAssistant,
+    devices: list[dict[str, Any]],
+) -> None:
+    """Ensure the single Genelec Zone entry exists when zones are known."""
+    has_group_entry = any(
+        cfg_entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_GROUP
+        for cfg_entry in hass.config_entries.async_entries(DOMAIN)
+    )
+    if has_group_entry:
+        return
+
+    for device_payload in devices:
+        if not isinstance(device_payload, dict):
+            continue
+        zone_id = device_payload.get(CONF_ZONE_ID)
+        zone_name = str(device_payload.get(CONF_ZONE_NAME, "")).strip()
+        if isinstance(zone_id, int) and zone_id > 0 and zone_name:
+            await hass.config_entries.flow.async_init(
+                DOMAIN,
+                context={"source": "import"},
+                data={
+                    CONF_ENTRY_TYPE: ENTRY_TYPE_GROUP,
+                    CONF_ZONE_ID: zone_id,
+                    CONF_ZONE_NAME: zone_name,
+                },
+            )
+            return
+
+
 type GenelecSmartIPConfigEntry = ConfigEntry[GenelecSmartIPData]
 
 
@@ -1073,6 +1103,9 @@ async def _async_setup_devices_hub_entry(
         *[_setup_one_device(raw_cfg) for raw_cfg in devices_cfg if isinstance(raw_cfg, dict)],
         return_exceptions=False,
     )
+
+    # Ensure Zone container exists immediately from persisted zone data.
+    await _ensure_group_entry_exists(hass, devices_cfg)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
