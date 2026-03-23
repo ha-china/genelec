@@ -59,6 +59,22 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_devices: list[dict[str, Any]] = []
         self._zeroconf: AsyncZeroconf | None = None
 
+    def is_matching(self, other_flow: config_entries.ConfigFlow) -> bool:
+        """Match only the same discovered device, not all Genelec devices."""
+        if not isinstance(other_flow, GenelecSmartIPConfigFlow):
+            return False
+        if not self._discovered_devices or not other_flow._discovered_devices:
+            return False
+        current = self._discovered_devices[0]
+        other = other_flow._discovered_devices[0]
+        return (
+            current.get(CONF_HOST) == other.get(CONF_HOST)
+            or (
+                current.get("mac")
+                and current.get("mac") == other.get("mac")
+            )
+        )
+
     def _get_devices_entry(self) -> config_entries.ConfigEntry | None:
         for entry in self.hass.config_entries.async_entries(DOMAIN):
             if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_DEVICE and entry.title == SINGLE_HUB_NAME:
