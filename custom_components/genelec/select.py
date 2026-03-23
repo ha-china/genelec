@@ -239,8 +239,15 @@ class GenelecPowerStateSelect(CoordinatorEntity, SelectEntity):
             return
 
         await self._device.set_power_state(api_state)
-        self._current_option = option
-        self._push_power_patch(api_state)
+        try:
+            power_data = await self._device.get_power_state()
+            real_state = power_data.get("state", api_state)
+        except Exception as e:
+            _LOGGER.warning("Failed to read back power state after write: %s", e)
+            real_state = api_state
+
+        self._current_option = POWER_STATE_API_TO_OPTION.get(real_state)
+        self._push_power_patch(real_state)
         self.async_write_ha_state()
 
     @property
