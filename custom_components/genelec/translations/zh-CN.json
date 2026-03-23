@@ -109,7 +109,9 @@
         "state": {
           "analog": "模拟输入",
           "aoip01": "AoIP 通道 1",
-          "aoip02": "AoIP 通道 2"
+          "aoip02": "AoIP 通道 2",
+          "aoip12": "AoIP 01 + AoIP 02",
+          "mix": "混合"
         }
       }
     },

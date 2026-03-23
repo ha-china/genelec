@@ -30,6 +30,7 @@ from .const import (
     ENTRY_TYPE_GROUP,
     INPUT_AOIP_01,
     INPUT_AOIP_02,
+    INPUT_AOIP_12,
     INPUT_ANALOG,
     INPUT_API_TO_DISPLAY,
     INPUT_DISPLAY_TO_API,
@@ -106,7 +107,10 @@ def _display_source_from_api_inputs(api_sources: list[str]) -> str:
     """Convert API source list to display name."""
     if not api_sources:
         return INPUT_NONE
-    if len(api_sources) > 1:
+    normalized = sorted(api_sources)
+    if normalized == ["AoIP01", "AoIP02"]:
+        return INPUT_AOIP_12
+    if normalized == ["A", "AoIP01", "AoIP02"]:
         return INPUT_MIX
     return INPUT_API_TO_DISPLAY.get(api_sources[0], api_sources[0])
 
@@ -457,9 +461,11 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         if source == INPUT_NONE:
             # No input - empty array
             api_sources = []
+        elif source == INPUT_AOIP_12:
+            api_sources = ["AoIP01", "AoIP02"]
         elif source == INPUT_MIX:
-            # Mix - select all inputs
-            api_sources = list(INPUT_DISPLAY_TO_API.values())
+            # Mix = Analog + AoIP01 + AoIP02
+            api_sources = ["A", "AoIP01", "AoIP02"]
         else:
             # Single source
             api_source = INPUT_DISPLAY_TO_API.get(source, source)
@@ -553,7 +559,7 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         self._is_muted = False
         self._power_state = POWER_STATE_STANDBY
         self._current_source = INPUT_NONE
-        self._source_list = [INPUT_NONE, INPUT_ANALOG, INPUT_AOIP_01, INPUT_AOIP_02, INPUT_MIX]
+        self._source_list = [INPUT_NONE, INPUT_ANALOG, INPUT_AOIP_01, INPUT_AOIP_02, INPUT_AOIP_12, INPUT_MIX]
 
     def _zone_targets(self) -> list[Any]:
         targets: list[Any] = []
@@ -732,10 +738,8 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         inputs = _normalize_api_inputs(inputs_data)
         if not inputs:
             self._current_source = INPUT_NONE
-        elif len(inputs) > 1:
-            self._current_source = INPUT_MIX
         else:
-            self._current_source = INPUT_API_TO_DISPLAY.get(inputs[0], inputs[0])
+            self._current_source = _display_source_from_api_inputs(inputs)
 
         self._attr_state = MediaPlayerState.ON if self._power_state == POWER_STATE_ACTIVE else MediaPlayerState.OFF
 
@@ -782,8 +786,10 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
     async def async_select_source(self, source: str) -> None:
         if source == INPUT_NONE:
             api_sources = []
+        elif source == INPUT_AOIP_12:
+            api_sources = ["AoIP01", "AoIP02"]
         elif source == INPUT_MIX:
-            api_sources = list(INPUT_DISPLAY_TO_API.values())
+            api_sources = ["A", "AoIP01", "AoIP02"]
         else:
             api_sources = [INPUT_DISPLAY_TO_API.get(source, source)]
 

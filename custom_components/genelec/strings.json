@@ -110,7 +110,9 @@
         "state": {
           "analog": "Analog",
           "aoip01": "AoIP Channel 1",
-          "aoip02": "AoIP Channel 2"
+          "aoip02": "AoIP Channel 2",
+          "aoip12": "AoIP 01 + AoIP 02",
+          "mix": "Mix"
         }
       }
     },

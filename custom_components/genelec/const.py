@@ -65,7 +65,8 @@ INPUT_AOIP_02_API = "AoIP02"
 INPUT_ANALOG = "Analog"
 INPUT_AOIP_01 = "AoIP 01"
 INPUT_AOIP_02 = "AoIP 02"
-INPUT_MIX = "AoIP 01 + AoIP 02"
+INPUT_AOIP_12 = "AoIP 01 + AoIP 02"
+INPUT_MIX = "Mix"
 INPUT_NONE = "No Input"
 
 # Input mapping
