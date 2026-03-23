@@ -214,6 +214,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
             INPUT_ANALOG,
             INPUT_AOIP_01,
             INPUT_AOIP_02,
+            INPUT_AOIP_12,
             INPUT_MIX,
         ]
 
@@ -730,17 +731,25 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         payload = sample.coordinator.data if sample.coordinator and sample.coordinator.data else {}
         volume_data = payload.get("volume", {})
         power_data = payload.get("power", {})
-        inputs_data = payload.get("inputs", {})
 
         self._volume = volume_data.get("level", self._volume)
         self._is_muted = volume_data.get("mute", self._is_muted)
         self._power_state = power_data.get("state", self._power_state)
 
-        inputs = _normalize_api_inputs(inputs_data)
-        if not inputs:
+        target_sources = []
+        for target in targets:
+            target_payload = target.coordinator.data if target.coordinator and target.coordinator.data else {}
+            target_inputs = tuple(_normalize_api_inputs(target_payload.get("inputs", {})))
+            target_sources.append(target_inputs)
+
+        unique_sources = {sources for sources in target_sources}
+        if not unique_sources:
             self._current_source = INPUT_NONE
+        elif len(unique_sources) == 1:
+            self._current_source = _display_source_from_api_inputs(list(next(iter(unique_sources))))
         else:
-            self._current_source = _display_source_from_api_inputs(inputs)
+            # Zone members are on different inputs; expose this clearly.
+            self._current_source = INPUT_MIX
 
         self._attr_state = MediaPlayerState.ON if self._power_state == POWER_STATE_ACTIVE else MediaPlayerState.OFF
 

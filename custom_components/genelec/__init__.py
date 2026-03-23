@@ -245,6 +245,14 @@ async def async_setup_entry(hass: HomeAssistant,
         data.device_info = {"_device_name": entry.data.get(CONF_DEVICE_NAME) or entry.title or device.name}
     data.device_info["_device_identifier"] = entry.unique_id or device.unique_id
 
+    # Fetch zone early so Genelec Zone can appear without waiting for a full poll cycle.
+    try:
+        early_zone = await device.get_zone_info()
+        if isinstance(early_zone, dict) and early_zone:
+            data.zone_info = early_zone
+    except Exception as e:
+        LOGGER.debug("Early zone info not available during setup: %s", e)
+
     if entry_type == ENTRY_TYPE_DEVICE:
         dev_reg = dr.async_get(hass)
         hub_device = dev_reg.async_get_or_create(
@@ -269,6 +277,26 @@ async def async_setup_entry(hass: HomeAssistant,
         )
         if speaker_device.via_device_id != hub_device.id:
             dev_reg.async_update_device(speaker_device.id, via_device_id=hub_device.id)
+
+    early_zone_id = data.zone_info.get("zone") if isinstance(data.zone_info, dict) else None
+    early_zone_name = str(data.zone_info.get("name", "")).strip() if isinstance(data.zone_info, dict) else ""
+    if isinstance(early_zone_id, int) and early_zone_id > 0 and early_zone_name:
+        if entry.data.get(CONF_ZONE_ID) != early_zone_id or entry.data.get(CONF_ZONE_NAME) != early_zone_name:
+            updated_entry_data = dict(entry.data)
+            updated_entry_data[CONF_ZONE_ID] = early_zone_id
+            updated_entry_data[CONF_ZONE_NAME] = early_zone_name
+            hass.config_entries.async_update_entry(entry, data=updated_entry_data)
+        if not data.group_bootstrapped:
+            await hass.config_entries.flow.async_init(
+                DOMAIN,
+                context={"source": "import"},
+                data={
+                    CONF_ENTRY_TYPE: ENTRY_TYPE_GROUP,
+                    CONF_ZONE_ID: early_zone_id,
+                    CONF_ZONE_NAME: early_zone_name,
+                },
+            )
+            data.group_bootstrapped = True
 
     # Create coordinator for centralized updates
     async def async_update_data():
@@ -865,6 +893,13 @@ async def _async_setup_devices_hub_entry(
 
         data.device_info["_device_identifier"] = device_unique_id
 
+        try:
+            early_zone = await device.get_zone_info()
+            if isinstance(early_zone, dict) and early_zone:
+                data.zone_info = early_zone
+        except Exception as e:
+            LOGGER.debug("Early zone info not available during hub setup: %s", e)
+
         speaker_device = dev_reg.async_get_or_create(
             config_entry_id=entry.entry_id,
             identifiers={(DOMAIN, device_unique_id)},
@@ -874,6 +909,32 @@ async def _async_setup_devices_hub_entry(
         )
         if speaker_device.via_device_id is not None:
             dev_reg.async_update_device(speaker_device.id, via_device_id=None)
+
+        early_zone_id = data.zone_info.get("zone") if isinstance(data.zone_info, dict) else None
+        early_zone_name = str(data.zone_info.get("name", "")).strip() if isinstance(data.zone_info, dict) else ""
+        if isinstance(early_zone_id, int) and early_zone_id > 0 and early_zone_name:
+            zone_changed = _update_persisted_device_zone(
+                hass,
+                entry,
+                device_unique_id,
+                early_zone_id,
+                early_zone_name,
+            )
+            if not data.group_bootstrapped:
+                await hass.config_entries.flow.async_init(
+                    DOMAIN,
+                    context={"source": "import"},
+                    data={
+                        CONF_ENTRY_TYPE: ENTRY_TYPE_GROUP,
+                        CONF_ZONE_ID: early_zone_id,
+                        CONF_ZONE_NAME: early_zone_name,
+                    },
+                )
+                data.group_bootstrapped = True
+            elif zone_changed:
+                for cfg_entry in hass.config_entries.async_entries(DOMAIN):
+                    if cfg_entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_GROUP:
+                        await hass.config_entries.async_reload(cfg_entry.entry_id)
 
         async def _make_update(target_data: GenelecSmartIPData, target_device: GenelecSmartIPDevice):
             async def async_update_data() -> dict[str, Any]:
