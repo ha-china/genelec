@@ -336,12 +336,18 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         """Set input sources and verify by reading back current inputs."""
         await self._ensure_active()
 
+        async def _apply_sources() -> None:
+            if len(api_sources) == 1:
+                await self._device.set_input_single(api_sources[0])
+            else:
+                await self._device.set_inputs(api_sources)
+
         try:
-            await self._device.set_inputs(api_sources)
+            await _apply_sources()
         except ClientResponseError as err:
             if err.status == 404:
                 await self._device.wake_up()
-                await self._device.set_inputs(api_sources)
+                await _apply_sources()
             else:
                 raise
 
@@ -350,7 +356,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         current = _normalize_api_inputs(inputs_data)
 
         if list(current) != list(api_sources):
-            await self._device.set_inputs(api_sources)
+            await _apply_sources()
             await asyncio.sleep(0.3)
             inputs_data = await self._device.get_inputs()
             current = _normalize_api_inputs(inputs_data)
@@ -359,7 +365,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
             # Last try: wake again then re-apply once.
             await self._ensure_active()
             await asyncio.sleep(0.6)
-            await self._device.set_inputs(api_sources)
+            await _apply_sources()
             await asyncio.sleep(0.3)
             inputs_data = await self._device.get_inputs()
             current = _normalize_api_inputs(inputs_data)
@@ -649,12 +655,19 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
     async def _set_target_inputs_with_verify(self, target: Any, api_sources: list[str]) -> list[str]:
         """Set inputs and verify by reading /audio/inputs."""
         await self._wake_target_if_needed(target)
+
+        async def _apply_sources() -> None:
+            if len(api_sources) == 1:
+                await target.device.set_input_single(api_sources[0])
+            else:
+                await target.device.set_inputs(api_sources)
+
         try:
-            await target.device.set_inputs(api_sources)
+            await _apply_sources()
         except ClientResponseError as err:
             if err.status == 404:
                 await target.device.wake_up()
-                await target.device.set_inputs(api_sources)
+                await _apply_sources()
             else:
                 raise
 
@@ -662,7 +675,7 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         current_inputs = await target.device.get_inputs()
         current = _normalize_api_inputs(current_inputs)
         if list(current) != list(api_sources):
-            await target.device.set_inputs(api_sources)
+            await _apply_sources()
             await asyncio.sleep(0.3)
             current_inputs = await target.device.get_inputs()
             current = _normalize_api_inputs(current_inputs)
@@ -670,7 +683,7 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         if list(current) != list(api_sources):
             await target.device.wake_up()
             await asyncio.sleep(0.6)
-            await target.device.set_inputs(api_sources)
+            await _apply_sources()
             await asyncio.sleep(0.3)
             current_inputs = await target.device.get_inputs()
             current = _normalize_api_inputs(current_inputs)
