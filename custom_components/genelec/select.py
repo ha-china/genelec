@@ -99,7 +99,12 @@ POWER_STATE_API_TO_OPTION = {
     POWER_STATE_ISS_SLEEP: "iss_sleep",
     POWER_STATE_PWR_FAIL: "pwr_fail",
 }
-POWER_STATE_OPTION_TO_API = {option: api for api, option in POWER_STATE_API_TO_OPTION.items()}
+POWER_STATE_OPTION_TO_API = {
+    "active": POWER_STATE_ACTIVE,
+    "standby": POWER_STATE_STANDBY,
+    "boot": POWER_STATE_BOOT,
+    "aoipboot": POWER_STATE_AOIPBOOT,
+}
 SETTABLE_POWER_STATES = {
     POWER_STATE_ACTIVE,
     POWER_STATE_STANDBY,
@@ -161,7 +166,7 @@ class GenelecPowerStateSelect(CoordinatorEntity, SelectEntity):
     # Entity is enabled by default
     _attr_entity_registry_enabled_default = True
 
-    _attr_options = list(POWER_STATE_OPTION_TO_API.keys())
+    _attr_options = ["active", "standby", "boot", "aoipboot"]
     _attr_translation_key = "power_state"
     _attr_icon = "mdi:power"
 
