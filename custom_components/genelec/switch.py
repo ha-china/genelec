@@ -40,16 +40,7 @@ async def async_setup_entry(
         async_add_entities(entities)
         return
 
-    coordinator = data.coordinator if data else None
-    device = data.device if data and data.device else None
-    if not device:
-        _LOGGER.error("Shared device instance not found")
-        return
-    device_info = data.device_info if data else {}
-    async_add_entities([
-        GenelecRJ45LedsSwitch(device, device_info, coordinator),
-        GenelecClipLedSwitch(device, device_info, coordinator),
-    ])
+    _LOGGER.error("Legacy single-device entries are no longer supported")
 
 
 class GenelecRJ45LedsSwitch(CoordinatorEntity, SwitchEntity):

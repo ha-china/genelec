@@ -13,7 +13,7 @@
     "requirements": [
         "zeroconf>=0.132.0"
     ],
-    "version": "0.4.6",
+    "version": "0.4.7",
     "zeroconf": [
         "_smart_ip._tcp.local."
     ]

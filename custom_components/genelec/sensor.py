@@ -109,7 +109,7 @@ async def async_setup_entry(
         async_add_entities(entities)
         return
 
-    async_add_entities(_build_entities(data))
+    LOGGER.error("Legacy single-device entries are no longer supported")
 
 
 class GenelecBaseSensor(CoordinatorEntity, SensorEntity):

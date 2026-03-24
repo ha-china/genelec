@@ -28,6 +28,8 @@ from .const import (
     GROUP_HUB_ID,
     ENTRY_TYPE_DEVICE,
     ENTRY_TYPE_GROUP,
+    INPUT_ANALOG_AOIP_01,
+    INPUT_ANALOG_AOIP_02,
     INPUT_AOIP_01,
     INPUT_AOIP_02,
     INPUT_AOIP_12,
@@ -66,6 +68,22 @@ def _iter_zone_sources(hass: HomeAssistant) -> list[Any]:
 
 def _iter_persisted_zones(hass: HomeAssistant) -> dict[int, tuple[str, int]]:
     """Return persisted zone info from Genelec Devices records."""
+    zone_index = hass.data.get(DOMAIN, {}).get("_zone_index", {})
+    if isinstance(zone_index, dict) and zone_index:
+        zones: dict[int, tuple[str, int]] = {}
+        for zone_id, record in zone_index.items():
+            try:
+                zid = int(zone_id)
+            except (TypeError, ValueError):
+                continue
+            if zid <= 0:
+                continue
+            zone_name = str((record or {}).get("name") or f"Zone {zid}").strip()
+            member_count = len((record or {}).get("members", []))
+            zones[zid] = (zone_name, member_count)
+        if zones:
+            return zones
+
     zones: dict[int, tuple[str, int]] = {}
     for cfg_entry in hass.config_entries.async_entries(DOMAIN):
         devices_cfg = cfg_entry.data.get("devices", [])
@@ -108,11 +126,23 @@ def _display_source_from_api_inputs(api_sources: list[str]) -> str:
     if not api_sources:
         return INPUT_NONE
     normalized = sorted(api_sources)
+    if normalized == ["A", "AoIP01"]:
+        return INPUT_ANALOG_AOIP_01
+    if normalized == ["A", "AoIP02"]:
+        return INPUT_ANALOG_AOIP_02
     if normalized == ["AoIP01", "AoIP02"]:
         return INPUT_AOIP_12
     if normalized == ["A", "AoIP01", "AoIP02"]:
         return INPUT_MIX
     return INPUT_API_TO_DISPLAY.get(api_sources[0], api_sources[0])
+
+
+async def _apply_inputs_payload(device: GenelecSmartIPDevice, api_sources: list[str]) -> None:
+    """Apply input selection, clearing lingering analog when needed."""
+    if api_sources and "A" not in api_sources:
+        await device.set_inputs([])
+        await asyncio.sleep(0.15)
+    await device.set_inputs(api_sources)
 
 
 async def async_setup_entry(
@@ -121,9 +151,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Genelec Smart IP media player entities."""
-    # Get shared data from hass.data
     data = hass.data[DOMAIN].get(entry.entry_id)
-    coordinator = getattr(data, "coordinator", None) if data else None
     entry_type = entry.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_DEVICE)
 
     if entry_type == ENTRY_TYPE_GROUP:
@@ -157,16 +185,7 @@ async def async_setup_entry(
         async_add_entities(entities)
         return
 
-    # Use shared device instance
-    device = data.device if data and data.device else None
-    if not device:
-        _LOGGER.error("Shared device instance not found")
-        return
-
-    # Get device info from shared data
-    device_info = data.device_info if data else {}
-
-    async_add_entities([GenelecSmartIPMediaPlayer(device, device_info, coordinator)])
+    _LOGGER.error("Legacy single-device entries are no longer supported")
 
 
 class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
@@ -214,6 +233,8 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
             INPUT_ANALOG,
             INPUT_AOIP_01,
             INPUT_AOIP_02,
+            INPUT_ANALOG_AOIP_01,
+            INPUT_ANALOG_AOIP_02,
             INPUT_AOIP_12,
             INPUT_MIX,
         ]
@@ -338,11 +359,11 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         await self._ensure_active()
 
         try:
-            await self._device.set_inputs(api_sources)
+            await _apply_inputs_payload(self._device, api_sources)
         except ClientResponseError as err:
             if err.status == 404:
                 await self._device.wake_up()
-                await self._device.set_inputs(api_sources)
+                await _apply_inputs_payload(self._device, api_sources)
             else:
                 raise
 
@@ -351,7 +372,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         current = _normalize_api_inputs(inputs_data)
 
         if list(current) != list(api_sources):
-            await self._device.set_inputs(api_sources)
+            await _apply_inputs_payload(self._device, api_sources)
             await asyncio.sleep(0.3)
             inputs_data = await self._device.get_inputs()
             current = _normalize_api_inputs(inputs_data)
@@ -360,7 +381,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
             # Last try: wake again then re-apply once.
             await self._ensure_active()
             await asyncio.sleep(0.6)
-            await self._device.set_inputs(api_sources)
+            await _apply_inputs_payload(self._device, api_sources)
             await asyncio.sleep(0.3)
             inputs_data = await self._device.get_inputs()
             current = _normalize_api_inputs(inputs_data)
@@ -462,6 +483,10 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         if source == INPUT_NONE:
             # No input - empty array
             api_sources = []
+        elif source == INPUT_ANALOG_AOIP_01:
+            api_sources = ["A", "AoIP01"]
+        elif source == INPUT_ANALOG_AOIP_02:
+            api_sources = ["A", "AoIP02"]
         elif source == INPUT_AOIP_12:
             api_sources = ["AoIP01", "AoIP02"]
         elif source == INPUT_MIX:
@@ -560,7 +585,16 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         self._is_muted = False
         self._power_state = POWER_STATE_STANDBY
         self._current_source = INPUT_NONE
-        self._source_list = [INPUT_NONE, INPUT_ANALOG, INPUT_AOIP_01, INPUT_AOIP_02, INPUT_AOIP_12, INPUT_MIX]
+        self._source_list = [
+            INPUT_NONE,
+            INPUT_ANALOG,
+            INPUT_AOIP_01,
+            INPUT_AOIP_02,
+            INPUT_ANALOG_AOIP_01,
+            INPUT_ANALOG_AOIP_02,
+            INPUT_AOIP_12,
+            INPUT_MIX,
+        ]
 
     def _zone_targets(self) -> list[Any]:
         targets: list[Any] = []
@@ -652,11 +686,11 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         await self._wake_target_if_needed(target)
 
         try:
-            await target.device.set_inputs(api_sources)
+            await _apply_inputs_payload(target.device, api_sources)
         except ClientResponseError as err:
             if err.status == 404:
                 await target.device.wake_up()
-                await target.device.set_inputs(api_sources)
+                await _apply_inputs_payload(target.device, api_sources)
             else:
                 raise
 
@@ -664,7 +698,7 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         current_inputs = await target.device.get_inputs()
         current = _normalize_api_inputs(current_inputs)
         if list(current) != list(api_sources):
-            await target.device.set_inputs(api_sources)
+            await _apply_inputs_payload(target.device, api_sources)
             await asyncio.sleep(0.3)
             current_inputs = await target.device.get_inputs()
             current = _normalize_api_inputs(current_inputs)
@@ -672,7 +706,7 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         if list(current) != list(api_sources):
             await target.device.wake_up()
             await asyncio.sleep(0.6)
-            await target.device.set_inputs(api_sources)
+            await _apply_inputs_payload(target.device, api_sources)
             await asyncio.sleep(0.3)
             current_inputs = await target.device.get_inputs()
             current = _normalize_api_inputs(current_inputs)
@@ -796,6 +830,10 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
     async def async_select_source(self, source: str) -> None:
         if source == INPUT_NONE:
             api_sources = []
+        elif source == INPUT_ANALOG_AOIP_01:
+            api_sources = ["A", "AoIP01"]
+        elif source == INPUT_ANALOG_AOIP_02:
+            api_sources = ["A", "AoIP02"]
         elif source == INPUT_AOIP_12:
             api_sources = ["AoIP01", "AoIP02"]
         elif source == INPUT_MIX:

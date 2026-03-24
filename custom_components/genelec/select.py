@@ -56,6 +56,22 @@ def _iter_zone_sources(hass: HomeAssistant) -> list[Any]:
 
 def _iter_persisted_zones(hass: HomeAssistant) -> dict[int, tuple[str, int]]:
     """Return persisted zone info from Genelec Devices records."""
+    zone_index = hass.data.get(DOMAIN, {}).get("_zone_index", {})
+    if isinstance(zone_index, dict) and zone_index:
+        zones: dict[int, tuple[str, int]] = {}
+        for zone_id, record in zone_index.items():
+            try:
+                zid = int(zone_id)
+            except (TypeError, ValueError):
+                continue
+            if zid <= 0:
+                continue
+            zone_name = str((record or {}).get("name") or f"Zone {zid}").strip()
+            member_count = len((record or {}).get("members", []))
+            zones[zid] = (zone_name, member_count)
+        if zones:
+            return zones
+
     zones: dict[int, tuple[str, int]] = {}
     for cfg_entry in hass.config_entries.async_entries(DOMAIN):
         devices_cfg = cfg_entry.data.get("devices", [])
@@ -98,9 +114,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Genelec Smart IP select entities."""
-    # Get shared data from hass.data
     data = hass.data[DOMAIN].get(entry.entry_id)
-    coordinator = getattr(data, "coordinator", None) if data else None
     entry_type = entry.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_DEVICE)
 
     if entry_type == ENTRY_TYPE_GROUP:
@@ -138,21 +152,7 @@ async def async_setup_entry(
         async_add_entities(entities)
         return
 
-    # Use shared device instance
-    device = data.device if data and data.device else None
-    if not device:
-        _LOGGER.error("Shared device instance not found")
-        return
-
-    # Get device info from shared data
-    device_info = data.device_info if data else {}
-
-    entities = [
-        GenelecPowerStateSelect(device, device_info, coordinator),
-        GenelecProfileSelect(device, device_info, coordinator),
-    ]
-
-    async_add_entities(entities)
+    _LOGGER.error("Legacy single-device entries are no longer supported")
 
 
 class GenelecPowerStateSelect(CoordinatorEntity, SelectEntity):

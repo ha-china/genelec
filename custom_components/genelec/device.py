@@ -69,6 +69,8 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 _HOSTNAME_RE = re.compile(r"^[A-Za-z0-9-]{1,63}$")
 _VALID_INPUTS = {INPUT_ANALOG_API, INPUT_AOIP_01_API, INPUT_AOIP_02_API}
+_HOST_LOCKS: dict[str, asyncio.Lock] = {}
+_HOST_LAST_REQUEST_AT: dict[str, float] = {}
 
 
 class GenelecSmartIPDevice:
@@ -91,13 +93,12 @@ class GenelecSmartIPDevice:
         self._port = port
         self._api_version = api_version
         self._session = session  # Use shared session
-        self._lock = lock or asyncio.Lock()  # Lock to ensure only one request at a time
+        self._lock = lock or _HOST_LOCKS.setdefault(host, asyncio.Lock())
         self._base_url = f"http://{host}:{port}{API_BASE.format(version=api_version)}"
         self._auth_header = self._create_auth_header()
         self._device_info: dict[str, Any] = {}
         self._device_id: dict[str, Any] = {}
-        self._last_request_at = 0.0
-        self._min_request_interval = 0.35
+        self._min_request_interval = 0.5
 
     def _create_auth_header(self) -> str:
         """Create Basic Auth header."""
@@ -129,7 +130,8 @@ class GenelecSmartIPDevice:
         # Use lock to ensure only one request at a time
         async with self._lock:
             now = asyncio.get_running_loop().time()
-            delta = now - self._last_request_at
+            last_request_at = _HOST_LAST_REQUEST_AT.get(self._host, 0.0)
+            delta = now - last_request_at
             if delta < self._min_request_interval:
                 await asyncio.sleep(self._min_request_interval - delta)
 
@@ -147,7 +149,7 @@ class GenelecSmartIPDevice:
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=10),
                 ) as response:
-                    self._last_request_at = asyncio.get_running_loop().time()
+                    _HOST_LAST_REQUEST_AT[self._host] = asyncio.get_running_loop().time()
                     if response.status == 503:
                         if attempt < 2:
                             await asyncio.sleep(0.5 * (attempt + 1))
@@ -247,15 +249,6 @@ class GenelecSmartIPDevice:
             raise ValueError("inputs must be any of: A, AoIP01, AoIP02")
         return await self._request(
             "PUT", ENDPOINT_AUDIO_INPUTS, {"input": sanitized}, quiet_statuses={404}
-        )
-
-    async def set_input_single(self, input_source: str) -> dict[str, Any]:
-        """Set a single audio input using scalar payload for compatibility."""
-        source = str(input_source)
-        if source not in _VALID_INPUTS:
-            raise ValueError("input_source must be one of: A, AoIP01, AoIP02")
-        return await self._request(
-            "PUT", ENDPOINT_AUDIO_INPUTS, {"input": source}, quiet_statuses={404}
         )
 
     async def get_led_settings(self) -> dict[str, Any]:
