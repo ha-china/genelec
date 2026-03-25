@@ -18,6 +18,13 @@ A custom integration for Home Assistant to control Genelec Smart IP series studi
 4. Search for "Genelec Smart IP"
 5. Click "Download"
 
+### Blueprints
+
+- Aqara H1 Rotary Dial Remote:
+  [![Open your Home Assistant instance and import this blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/ha-china/genelec/blob/main/blueprint/aqara_h1_rotary_dial_remote.yaml)
+- Philips Hue Tap Dial Switch:
+  [![Open your Home Assistant instance and import this blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/ha-china/genelec/blob/main/blueprint/philips-hue-tap-dial-switch.yaml)
+
 ### Manual Installation
 
 1. Download this repository
