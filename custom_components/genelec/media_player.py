@@ -215,7 +215,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         self._device = device
         self._device_info = device_info
         self._coordinator = coordinator
-        self._attr_name = "Speaker"
+        self._attr_name = "Monitor"
         self._attr_unique_id = device.unique_id
         self._attr_device_info = {
             "identifiers": {(DOMAIN, device_info.get("_device_identifier", device.unique_id))},
