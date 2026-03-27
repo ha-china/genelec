@@ -142,6 +142,33 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self._get_devices_entry()
         return self._get_devices_entry()
 
+    async def _resolve_device_name(
+        self,
+        device: GenelecSmartIPDevice,
+        fallback_name: str,
+        host: str,
+    ) -> str:
+        """Resolve preferred display name for a single device."""
+        try:
+            aoip_identity = await device.get_aoip_identity()
+            receiver_name = aoip_identity.get("fname") if isinstance(aoip_identity, dict) else None
+            if isinstance(receiver_name, str) and receiver_name.strip():
+                return receiver_name.strip()
+        except Exception:
+            pass
+
+        try:
+            network = await device.get_network_config()
+            hostname = network.get("hostname") if isinstance(network, dict) else None
+            if isinstance(hostname, str) and hostname.strip():
+                return hostname.strip()
+        except Exception:
+            pass
+
+        if isinstance(fallback_name, str) and fallback_name.strip():
+            return fallback_name.strip()
+        return host
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -177,14 +204,11 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
 
                     if await device.test_connection():
-                        device_name = user_input[CONF_HOST]
-                        try:
-                            network = await device.get_network_config()
-                            hostname = network.get("hostname") if isinstance(network, dict) else None
-                            if isinstance(hostname, str) and hostname.strip():
-                                device_name = hostname.strip()
-                        except Exception:
-                            pass
+                        device_name = await self._resolve_device_name(
+                            device,
+                            fallback_name=user_input[CONF_HOST],
+                            host=user_input[CONF_HOST],
+                        )
 
                         try:
                             await device.get_device_id()
@@ -346,6 +370,11 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
 
                     if await device.test_connection():
+                        device_name = await self._resolve_device_name(
+                            device,
+                            fallback_name=device_info.get("name") or "Genelec Smart IP",
+                            host=device_info[CONF_HOST],
+                        )
                         try:
                             await device.get_device_id()
                         except Exception:
@@ -357,7 +386,7 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_USERNAME: user_input.get(CONF_USERNAME, DEFAULT_USERNAME),
                             CONF_PASSWORD: user_input.get(CONF_PASSWORD, DEFAULT_PASSWORD),
                             CONF_API_VERSION: DEFAULT_API_VERSION,
-                            CONF_DEVICE_NAME: f"{(device_info.get('name') or 'Genelec Smart IP')} [{device_info[CONF_HOST]}]",
+                            CONF_DEVICE_NAME: f"{device_name} [{device_info[CONF_HOST]}]",
                             "unique_id": device.unique_id,
                         }
                         return await self._upsert_device_into_hub(data)
