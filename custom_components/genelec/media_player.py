@@ -863,9 +863,18 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
             vol_ip, vol_port = endpoint
             await targets[0].device.send_multicast({"mute": mute}, vol_ip, vol_port)
         else:
-            await asyncio.gather(
-                *(target.device.set_volume(mute=mute) for target in targets)
+            results = await asyncio.gather(
+                *(target.device.set_volume(mute=mute) for target in targets),
+                return_exceptions=True,
             )
+            for target, result in zip(targets, results, strict=False):
+                if isinstance(result, Exception):
+                    _LOGGER.warning(
+                        "Zone '%s' mute update failed for %s: %s",
+                        self._zone_name,
+                        getattr(target.device, "host", "unknown"),
+                        result,
+                    )
         for target in targets:
             self._patch_target(target, {"volume": {"mute": mute}})
 
@@ -887,7 +896,18 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
                 await self._wake_target_if_needed(target)
                 await target.device.set_volume(level=level)
 
-            await asyncio.gather(*(_set_target_level(target) for target in targets))
+            results = await asyncio.gather(
+                *(_set_target_level(target) for target in targets),
+                return_exceptions=True,
+            )
+            for target, result in zip(targets, results, strict=False):
+                if isinstance(result, Exception):
+                    _LOGGER.warning(
+                        "Zone '%s' volume update failed for %s: %s",
+                        self._zone_name,
+                        getattr(target.device, "host", "unknown"),
+                        result,
+                    )
         for target in targets:
             self._patch_target(target, {"volume": {"level": level}})
 

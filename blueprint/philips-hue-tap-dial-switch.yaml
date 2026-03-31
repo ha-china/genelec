@@ -5,7 +5,7 @@ blueprint:
   description: |
     # Philips Hue Tap Dial Switch (Z2M / ZHA)
 
-    [![GitHub Repository](https://img.shields.io/badge/My%20GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/danielpetrovic/home-assistant-config) [![Blueprint Code](https://img.shields.io/badge/View-Blueprint%20Code-2ea44f?style=for-the-badge&logo=homeassistant&logoColor=white)](https://github.com/danielpetrovic/home-assistant-config/blob/main/blueprints/automation/danielpetrovic/philips-hue-tap-dial-switch.yaml) ![Version](https://img.shields.io/badge/Version-2026.02.3-blue?style=for-the-badge)
+    [![GitHub Repository](https://img.shields.io/badge/My%20GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/danielpetrovic/home-assistant-config) [![Blueprint Code](https://img.shields.io/badge/View-Blueprint%20Code-2ea44f?style=for-the-badge&logo=homeassistant&logoColor=white)](https://github.com/danielpetrovic/home-assistant-config/blob/main/blueprints/automation/danielpetrovic/philips-hue-tap-dial-switch.yaml) ![Version](https://img.shields.io/badge/Version-2026.02.4-blue?style=for-the-badge)
 
     This blueprint enables comprehensive control of a Philips Hue Tap Dial Switch through Zigbee2MQTT or ZHA integration, supporting custom actions, light automation, and media player control.
 
@@ -34,6 +34,10 @@ blueprint:
     version_info:
       name: Version History
       description: |
+        - **2026.02.4: Restore media power toggle action**
+          - Fixed: Media mode `toggle` now works again and calls `media_player.toggle`
+          - Added: Explicit `Toggle Power` option back to media mode selections
+
         - **2026.02.3: Add play/pause and mute toggle media actions**
           - Changed: Media mode Toggle now calls `media_player.media_play_pause`
           - Added: Media mode Mute Toggle option to flip mute state based on `is_volume_muted`
@@ -617,6 +621,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -659,6 +665,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -701,6 +709,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -743,6 +753,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -1167,6 +1179,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -1209,6 +1223,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -1236,7 +1252,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_2_double_media_mode:
           name: Double Press Mode
           default: []
@@ -1251,6 +1267,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -1260,7 +1278,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_2_double_media_control:
           name: Double Press Control
           default: media_next_track
@@ -1278,7 +1296,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_2_triple_media_mode:
           name: Triple Press Mode
           default: []
@@ -1293,6 +1311,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -1302,7 +1322,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_2_triple_media_control:
           name: Triple Press Control
           default: media_previous_track
@@ -1320,7 +1340,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_2_rotate_media_mode:
           name: Rotate Mode
           default: volume
@@ -1334,7 +1354,7 @@ blueprint:
                 - label: "Volume"
                   value: volume
               custom_value: false
-              multiple: true
+              multiple: false
     button_3_custom:
       name: Button 3 - Custom Actions
       icon: mdi:numeric-3-circle-outline
@@ -1717,6 +1737,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -1726,7 +1748,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_3_short_release_media_control:
           name: Short Release Control
           default: volume_set
@@ -1744,7 +1766,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_3_long_release_media_mode:
           name: Long Release Mode
           default: turn_off
@@ -1759,6 +1781,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -1768,7 +1792,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_3_long_release_media_control:
           name: Long Release Control
           default: []
@@ -1786,7 +1810,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_3_double_media_mode:
           name: Double Press Mode
           default: []
@@ -1801,6 +1825,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -1810,7 +1836,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_3_double_media_control:
           name: Double Press Control
           default: media_next_track
@@ -1828,7 +1854,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_3_triple_media_mode:
           name: Triple Press Mode
           default: []
@@ -1843,6 +1869,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -1852,7 +1880,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_3_triple_media_control:
           name: Triple Press Control
           default: media_previous_track
@@ -1870,7 +1898,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_3_rotate_media_mode:
           name: Rotate Mode
           default: volume
@@ -1884,7 +1912,7 @@ blueprint:
                 - label: "Volume"
                   value: volume
               custom_value: false
-              multiple: true
+              multiple: false
     button_4_custom:
       name: Button 4 - Custom Actions
       icon: mdi:numeric-4-circle-outline
@@ -2267,6 +2295,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -2276,7 +2306,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_4_short_release_media_control:
           name: Short Release Control
           default: volume_set
@@ -2294,7 +2324,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_4_long_release_media_mode:
           name: Long Release Mode
           default: turn_off
@@ -2309,6 +2339,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -2318,7 +2350,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_4_long_release_media_control:
           name: Long Release Control
           default: []
@@ -2336,7 +2368,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_4_double_media_mode:
           name: Double Press Mode
           default: []
@@ -2351,6 +2383,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -2360,7 +2394,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_4_double_media_control:
           name: Double Press Control
           default: media_next_track
@@ -2378,7 +2412,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_4_triple_media_mode:
           name: Triple Press Mode
           default: []
@@ -2393,6 +2427,8 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
+                - label: "Toggle Power"
+                  value: toggle
                 - label: "Play/Pause"
                   value: play_pause
                 - label: "Mute"
@@ -2402,7 +2438,7 @@ blueprint:
                 - label: "Mute Toggle"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_4_triple_media_control:
           name: Triple Press Control
           default: media_previous_track
@@ -2420,7 +2456,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_4_rotate_media_mode:
           name: Rotate Mode
           default: volume
@@ -2434,7 +2470,7 @@ blueprint:
                 - label: "Volume"
                   value: volume
               custom_value: false
-              multiple: true
+              multiple: false
 
 mode: single
 max_exceeded: silent
@@ -3279,6 +3315,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_1_media }}"
+                  - if: "{{ 'toggle' in button_1_short_release_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_1_media }}"
                   - if: "{{ 'play_pause' in button_1_short_release_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -3409,6 +3450,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_1_media }}"
+                  - if: "{{ 'toggle' in button_1_long_release_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_1_media }}"
                   - if: "{{ 'play_pause' in button_1_long_release_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -3468,6 +3514,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_1_media }}"
+                  - if: "{{ 'toggle' in button_1_double_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_1_media }}"
                   - if: "{{ 'play_pause' in button_1_double_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -3525,6 +3576,11 @@ actions:
                   - if: "{{ 'turn_off' in button_1_triple_media_mode }}"
                     then:
                       - action: media_player.turn_off
+                        target:
+                          entity_id: "{{ button_1_media }}"
+                  - if: "{{ 'toggle' in button_1_triple_media_mode }}"
+                    then:
+                      - action: media_player.toggle
                         target:
                           entity_id: "{{ button_1_media }}"
                   - if: "{{ 'play_pause' in button_1_triple_media_mode }}"
@@ -3696,6 +3752,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_2_media }}"
+                  - if: "{{ 'toggle' in button_2_short_release_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_2_media }}"
                   - if: "{{ 'play_pause' in button_2_short_release_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -3826,6 +3887,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_2_media }}"
+                  - if: "{{ 'toggle' in button_2_long_release_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_2_media }}"
                   - if: "{{ 'play_pause' in button_2_long_release_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -3885,6 +3951,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_2_media }}"
+                  - if: "{{ 'toggle' in button_2_double_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_2_media }}"
                   - if: "{{ 'play_pause' in button_2_double_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -3942,6 +4013,11 @@ actions:
                   - if: "{{ 'turn_off' in button_2_triple_media_mode }}"
                     then:
                       - action: media_player.turn_off
+                        target:
+                          entity_id: "{{ button_2_media }}"
+                  - if: "{{ 'toggle' in button_2_triple_media_mode }}"
+                    then:
+                      - action: media_player.toggle
                         target:
                           entity_id: "{{ button_2_media }}"
                   - if: "{{ 'play_pause' in button_2_triple_media_mode }}"
@@ -4113,6 +4189,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_3_media }}"
+                  - if: "{{ 'toggle' in button_3_short_release_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_3_media }}"
                   - if: "{{ 'play_pause' in button_3_short_release_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -4243,6 +4324,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_3_media }}"
+                  - if: "{{ 'toggle' in button_3_long_release_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_3_media }}"
                   - if: "{{ 'play_pause' in button_3_long_release_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -4302,6 +4388,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_3_media }}"
+                  - if: "{{ 'toggle' in button_3_double_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_3_media }}"
                   - if: "{{ 'play_pause' in button_3_double_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -4359,6 +4450,11 @@ actions:
                   - if: "{{ 'turn_off' in button_3_triple_media_mode }}"
                     then:
                       - action: media_player.turn_off
+                        target:
+                          entity_id: "{{ button_3_media }}"
+                  - if: "{{ 'toggle' in button_3_triple_media_mode }}"
+                    then:
+                      - action: media_player.toggle
                         target:
                           entity_id: "{{ button_3_media }}"
                   - if: "{{ 'play_pause' in button_3_triple_media_mode }}"
@@ -4530,6 +4626,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_4_media }}"
+                  - if: "{{ 'toggle' in button_4_short_release_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_4_media }}"
                   - if: "{{ 'play_pause' in button_4_short_release_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -4660,6 +4761,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_4_media }}"
+                  - if: "{{ 'toggle' in button_4_long_release_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_4_media }}"
                   - if: "{{ 'play_pause' in button_4_long_release_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -4719,6 +4825,11 @@ actions:
                       - action: media_player.turn_off
                         target:
                           entity_id: "{{ button_4_media }}"
+                  - if: "{{ 'toggle' in button_4_double_media_mode }}"
+                    then:
+                      - action: media_player.toggle
+                        target:
+                          entity_id: "{{ button_4_media }}"
                   - if: "{{ 'play_pause' in button_4_double_media_mode }}"
                     then:
                       - action: media_player.media_play_pause
@@ -4776,6 +4887,11 @@ actions:
                   - if: "{{ 'turn_off' in button_4_triple_media_mode }}"
                     then:
                       - action: media_player.turn_off
+                        target:
+                          entity_id: "{{ button_4_media }}"
+                  - if: "{{ 'toggle' in button_4_triple_media_mode }}"
+                    then:
+                      - action: media_player.toggle
                         target:
                           entity_id: "{{ button_4_media }}"
                   - if: "{{ 'play_pause' in button_4_triple_media_mode }}"
