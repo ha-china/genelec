@@ -621,18 +621,18 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
-                  value: toggle
-                - label: "Play/Pause"
-                  value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Power)"
+                  value: toggle
+                - label: "Toggle (Play)"
+                  value: play_pause
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_1_short_release_media_control:
           name: Short Release Control
           default: volume_set
@@ -650,7 +650,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_1_long_release_media_mode:
           name: Long Release Mode
           default: turn_off
@@ -665,18 +665,18 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
-                  value: toggle
-                - label: "Play/Pause"
-                  value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Power)"
+                  value: toggle
+                - label: "Toggle (Play)"
+                  value: play_pause
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_1_long_release_media_control:
           name: Long Release Control
           default: []
@@ -694,7 +694,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_1_double_media_mode:
           name: Double Press Mode
           default: []
@@ -709,18 +709,18 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
-                  value: toggle
-                - label: "Play/Pause"
-                  value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Power)"
+                  value: toggle
+                - label: "Toggle (Play)"
+                  value: play_pause
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_1_double_media_control:
           name: Double Press Control
           default: media_next_track
@@ -738,7 +738,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_1_triple_media_mode:
           name: Triple Press Mode
           default: []
@@ -753,18 +753,18 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
-                  value: toggle
-                - label: "Play/Pause"
-                  value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Power)"
+                  value: toggle
+                - label: "Toggle (Play)"
+                  value: play_pause
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_1_triple_media_control:
           name: Triple Press Control
           default: media_previous_track
@@ -782,7 +782,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_1_rotate_media_mode:
           name: Rotate Mode
           default: volume
@@ -796,7 +796,7 @@ blueprint:
                 - label: "Volume"
                   value: volume
               custom_value: false
-              multiple: true
+              multiple: false
     button_2_custom:
       name: Button 2 - Custom Actions
       icon: mdi:numeric-2-circle-outline
@@ -1179,18 +1179,18 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
-                  value: toggle
-                - label: "Play/Pause"
-                  value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Power)"
+                  value: toggle
+                - label: "Toggle (Play)"
+                  value: play_pause
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_2_short_release_media_control:
           name: Short Release Control
           default: volume_set
@@ -1208,7 +1208,7 @@ blueprint:
                 - label: "Set Volume"
                   value: volume_set
               custom_value: false
-              multiple: true
+              multiple: false
         button_2_long_release_media_mode:
           name: Long Release Mode
           default: turn_off
@@ -1223,18 +1223,18 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
-                  value: toggle
-                - label: "Play/Pause"
-                  value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Power)"
+                  value: toggle
+                - label: "Toggle (Play)"
+                  value: play_pause
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
-              multiple: true
+              multiple: false
         button_2_long_release_media_control:
           name: Long Release Control
           default: []
@@ -1267,15 +1267,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false
@@ -1311,15 +1311,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false
@@ -1737,15 +1737,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false
@@ -1781,15 +1781,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false
@@ -1825,15 +1825,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false
@@ -1869,15 +1869,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false
@@ -2295,15 +2295,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false
@@ -2339,15 +2339,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false
@@ -2383,15 +2383,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false
@@ -2427,15 +2427,15 @@ blueprint:
                   value: turn_on
                 - label: "Turn Off"
                   value: turn_off
-                - label: "Toggle Power"
+                - label: "Toggle (Power)"
                   value: toggle
-                - label: "Play/Pause"
+                - label: "Toggle (Play)"
                   value: play_pause
                 - label: "Mute"
                   value: mute
                 - label: "Unmute"
                   value: unmute
-                - label: "Mute Toggle"
+                - label: "Toggle (Mute)"
                   value: mute_unmute
               custom_value: false
               multiple: false

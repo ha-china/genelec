@@ -1,0 +1,103 @@
+blueprint:
+  name: M5Stack Dial Media Event Controller
+  description: |
+    Bind an ESPHome M5Stack Dial event entity to a Home Assistant media player.
+
+    Expected event types from ESPHome:
+    - `volume_up`
+    - `volume_down`
+    - `mute_toggle`
+    - `power_toggle`
+  domain: automation
+  homeassistant:
+    min_version: 2024.10.0
+  input:
+    dial_event:
+      name: M5Stack Dial Event
+      description: ESPHome event entity created by the M5Stack Dial config.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - event
+          multiple: false
+    media_player:
+      name: Media Player
+      description: Media player to control.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - media_player
+          multiple: false
+    volume_step:
+      name: Volume Step
+      description: Volume step used for each dial detent.
+      default: 0.05
+      selector:
+        number:
+          min: 0.01
+          max: 0.20
+          step: 0.01
+          mode: slider
+
+mode: parallel
+max: 20
+
+triggers:
+  - trigger: state
+    entity_id: !input dial_event
+    not_from:
+      - unavailable
+      - unknown
+    not_to:
+      - unavailable
+      - unknown
+
+variables:
+  media_player_entity: !input media_player
+  volume_step: !input volume_step
+  event_type: "{{ trigger.to_state.attributes.event_type | default('') }}"
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'volume_up' }}"
+        sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: !input media_player
+            data:
+              volume_level: >-
+                {{ [1.0, (state_attr(media_player_entity, 'volume_level') | float(0)) + volume_step] | min }}
+
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'volume_down' }}"
+        sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: !input media_player
+            data:
+              volume_level: >-
+                {{ [0.0, (state_attr(media_player_entity, 'volume_level') | float(0)) - volume_step] | max }}
+
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'mute_toggle' }}"
+        sequence:
+          - action: media_player.volume_mute
+            target:
+              entity_id: !input media_player
+            data:
+              is_volume_muted: >-
+                {{ not (state_attr(media_player_entity, 'is_volume_muted') | default(false)) }}
+
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'power_toggle' }}"
+        sequence:
+          - action: media_player.toggle
+            target:
+              entity_id: !input media_player

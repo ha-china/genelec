@@ -24,6 +24,8 @@ A custom integration for Home Assistant to control Genelec Smart IP series studi
   [![Open your Home Assistant instance and import this blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/ha-china/genelec/blob/main/blueprint/aqara_h1_rotary_dial_remote.yaml)
 - Philips Hue Tap Dial Switch:
   [![Open your Home Assistant instance and import this blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/ha-china/genelec/blob/main/blueprint/philips-hue-tap-dial-switch.yaml)
+- M5Stack Dial Media Event Controller:
+  [![Open your Home Assistant instance and import this blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https://github.com/ha-china/genelec/blob/main/blueprint/m5stack-dial-media-event-controller.yaml)
 
 ### Manual Installation
 
