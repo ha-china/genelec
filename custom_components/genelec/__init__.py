@@ -726,6 +726,15 @@ async def async_setup_entry(hass: HomeAssistant,
             filtered.append(target_data)
         return filtered
 
+    async def _resolve_group_multicast_endpoint(
+        target_datas: list[GenelecSmartIPData],
+    ) -> tuple[str, int] | None:
+        for target_data in target_datas:
+            endpoint = await _resolve_multicast_endpoint(target_data)
+            if endpoint is not None:
+                return endpoint
+        return None
+
     async def handle_set_volume_level(call):
         """Handle set volume level service."""
         has_entity = bool(call.data.get("entity_id"))
@@ -743,6 +752,20 @@ async def async_setup_entry(hass: HomeAssistant,
         if not target_datas:
             LOGGER.warning("set_volume_level did not resolve any target entries")
             return
+
+        if len(target_datas) > 1:
+            multicast_endpoint = await _resolve_group_multicast_endpoint(target_datas)
+            if multicast_endpoint is None:
+                LOGGER.warning("Group set_volume_level has no usable multicast endpoint")
+                return
+
+            ip_value, port_value = multicast_endpoint
+            multicast_level = max(-130.0, min(0.0, float(level)))
+            await target_datas[0].device.send_multicast({"level": multicast_level}, ip_value, port_value)
+            for target_data in target_datas:
+                await _patch_coordinator(target_data, {"volume": {"level": level}})
+            return
+
         for target_data in target_datas:
 
             # Ensure ACTIVE before applying sensitivity.
@@ -854,7 +877,20 @@ async def async_setup_entry(hass: HomeAssistant,
     async def handle_multicast_set_mute(call):
         """Handle multicast mute command."""
         mute = bool(call.data.get("mute", False))
-        for target_data in await _get_target_datas_from_call(call):
+        target_datas = await _get_target_datas_from_call(call)
+        if len(target_datas) > 1:
+            multicast_endpoint = await _resolve_group_multicast_endpoint(target_datas)
+            if multicast_endpoint is None:
+                LOGGER.warning("Group multicast_set_mute has no usable multicast endpoint")
+                return
+
+            ip_value, port_value = multicast_endpoint
+            await target_datas[0].device.send_multicast({"mute": mute}, ip_value, port_value)
+            for target_data in target_datas:
+                await _patch_coordinator(target_data, {"volume": {"mute": mute}})
+            return
+
+        for target_data in target_datas:
             endpoint = await _resolve_multicast_endpoint(target_data)
             if endpoint is None:
                 continue
