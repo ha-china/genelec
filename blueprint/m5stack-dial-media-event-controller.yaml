@@ -1,7 +1,7 @@
 blueprint:
   name: M5Stack Dial Media Event Controller
   description: |
-    Bind an ESPHome M5Stack Dial event entity to a Home Assistant media player.
+    Bind an ESPHome M5Stack Dial event entity to Genelec zone media players.
 
     Expected event types from ESPHome:
     - `button_single`
@@ -9,6 +9,12 @@ blueprint:
     - `button_long`
     - `rotate_left`
     - `rotate_right`
+    - `zone_prev`
+    - `zone_next`
+    - `profile_prev`
+    - `profile_next`
+    - `source_prev`
+    - `source_next`
   domain: automation
   homeassistant:
     min_version: 2024.10.0
@@ -24,12 +30,63 @@ blueprint:
           multiple: false
     media_player:
       name: Media Player
-      description: Media player to control.
+      description: Fallback media player when no zone list is configured.
       selector:
         entity:
           filter:
             - domain:
                 - media_player
+          multiple: false
+    zone_media_players:
+      name: Zone Media Players
+      description: Ordered list of Genelec zone group media players to cycle on the M5 second screen.
+      default: []
+      selector:
+        entity:
+          filter:
+            - integration: genelec
+              domain:
+                - media_player
+          multiple: true
+    current_zone_helper:
+      name: Current Zone Input Text
+      description: Input text helper used to remember the currently selected zone media_player entity_id.
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain:
+                - input_text
+          multiple: false
+    current_zone_name_helper:
+      name: Current Zone Name Input Text
+      description: Optional input_text helper used to expose the selected zone name to ESPHome.
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain:
+                - input_text
+          multiple: false
+    current_profile_helper:
+      name: Current Profile Input Text
+      description: Optional input_text helper used to expose the current profile to ESPHome.
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain:
+                - input_text
+          multiple: false
+    current_source_helper:
+      name: Current Source Input Text
+      description: Optional input_text helper used to expose the current source to ESPHome.
+      default: []
+      selector:
+        entity:
+          filter:
+            - domain:
+                - input_text
           multiple: false
     default_volume:
       name: Default Volume
@@ -185,6 +242,11 @@ triggers:
 
 variables:
   media_player_entity: !input media_player
+  zone_media_players: !input zone_media_players
+  current_zone_helper: !input current_zone_helper
+  current_zone_name_helper: !input current_zone_name_helper
+  current_profile_helper: !input current_profile_helper
+  current_source_helper: !input current_source_helper
   default_volume: !input default_volume
   volume_step: !input volume_step
   button_single_action: !input button_single_action
@@ -193,6 +255,192 @@ variables:
   rotate_left_action: !input rotate_left_action
   rotate_right_action: !input rotate_right_action
   event_type: "{{ trigger.to_state.attributes.event_type | default('') }}"
+  configured_zone_media_players: >-
+    {{ zone_media_players if zone_media_players is sequence and zone_media_players is not string else [] }}
+  current_zone_media: >-
+    {% set helper_value = states(current_zone_helper) if current_zone_helper is string and current_zone_helper != '' else '' %}
+    {% if helper_value in configured_zone_media_players %}
+      {{ helper_value }}
+    {% elif configured_zone_media_players | count > 0 %}
+      {{ configured_zone_media_players[0] }}
+    {% else %}
+      {{ media_player_entity }}
+    {% endif %}
+  current_zone_device: >-
+    {% if current_zone_media is string and current_zone_media != '' %}
+      {{ device_id(current_zone_media) | default('', true) }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  current_profile_select: >-
+    {% if current_zone_device is string and current_zone_device != '' %}
+      {{ device_entities(current_zone_device) | select('match', '^select\\..*_profile$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  current_source_list: >-
+    {{ state_attr(current_zone_media, 'source_list') | default([], true) }}
+  current_source: >-
+    {{ state_attr(current_zone_media, 'source') | default('', true) }}
+  current_zone_name: >-
+    {% set friendly = state_attr(current_zone_media, 'friendly_name') | default('', true) %}
+    {% if friendly.endswith(' Group') %}
+      {{ friendly[:-6] }}
+    {% elif friendly != '' %}
+      {{ friendly }}
+    {% else %}
+      {{ current_zone_media }}
+    {% endif %}
+  current_profile_options: >-
+    {{ state_attr(current_profile_select, 'options') | default([], true) }}
+  current_profile: >-
+    {{ states(current_profile_select) if current_profile_select is string and current_profile_select != '' else '' }}
+  previous_zone_media: >-
+    {% set zones = configured_zone_media_players %}
+    {% set current = current_zone_media %}
+    {% set ns = namespace(result='') %}
+    {% if zones | count == 0 %}
+      {{ '' }}
+    {% elif current not in zones %}
+      {{ zones[-1] }}
+    {% else %}
+      {% for zone in zones %}
+        {% if zone == current %}
+          {% set ns.result = zones[loop.index0 - 1] %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.result }}
+    {% endif %}
+  next_zone_media: >-
+    {% set zones = configured_zone_media_players %}
+    {% set current = current_zone_media %}
+    {% set ns = namespace(result='') %}
+    {% if zones | count == 0 %}
+      {{ '' }}
+    {% elif current not in zones %}
+      {{ zones[0] }}
+    {% else %}
+      {% for zone in zones %}
+        {% if zone == current %}
+          {% set ns.result = zones[0] if loop.last else zones[loop.index0 + 1] %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.result }}
+    {% endif %}
+  previous_zone_name: >-
+    {% set friendly = state_attr(previous_zone_media, 'friendly_name') | default('', true) %}
+    {% if friendly.endswith(' Group') %}
+      {{ friendly[:-6] }}
+    {% elif friendly != '' %}
+      {{ friendly }}
+    {% else %}
+      {{ previous_zone_media }}
+    {% endif %}
+  next_zone_name: >-
+    {% set friendly = state_attr(next_zone_media, 'friendly_name') | default('', true) %}
+    {% if friendly.endswith(' Group') %}
+      {{ friendly[:-6] }}
+    {% elif friendly != '' %}
+      {{ friendly }}
+    {% else %}
+      {{ next_zone_media }}
+    {% endif %}
+  previous_zone_device: >-
+    {% if previous_zone_media is string and previous_zone_media != '' %}
+      {{ device_id(previous_zone_media) | default('', true) }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  next_zone_device: >-
+    {% if next_zone_media is string and next_zone_media != '' %}
+      {{ device_id(next_zone_media) | default('', true) }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  previous_zone_profile_select: >-
+    {% if previous_zone_device is string and previous_zone_device != '' %}
+      {{ device_entities(previous_zone_device) | select('match', '^select\\..*_profile$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  next_zone_profile_select: >-
+    {% if next_zone_device is string and next_zone_device != '' %}
+      {{ device_entities(next_zone_device) | select('match', '^select\\..*_profile$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  previous_zone_profile: >-
+    {{ states(previous_zone_profile_select) if previous_zone_profile_select is string and previous_zone_profile_select != '' else '' }}
+  next_zone_profile: >-
+    {{ states(next_zone_profile_select) if next_zone_profile_select is string and next_zone_profile_select != '' else '' }}
+  previous_zone_source: >-
+    {{ state_attr(previous_zone_media, 'source') | default('', true) }}
+  next_zone_source: >-
+    {{ state_attr(next_zone_media, 'source') | default('', true) }}
+  previous_profile: >-
+    {% set options = current_profile_options if current_profile_options is sequence and current_profile_options is not string else [] %}
+    {% set current = current_profile %}
+    {% set ns = namespace(result='') %}
+    {% if options | count == 0 %}
+      {{ '' }}
+    {% elif current not in options %}
+      {{ options[-1] }}
+    {% else %}
+      {% for option in options %}
+        {% if option == current %}
+          {% set ns.result = options[loop.index0 - 1] %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.result }}
+    {% endif %}
+  next_profile: >-
+    {% set options = current_profile_options if current_profile_options is sequence and current_profile_options is not string else [] %}
+    {% set current = current_profile %}
+    {% set ns = namespace(result='') %}
+    {% if options | count == 0 %}
+      {{ '' }}
+    {% elif current not in options %}
+      {{ options[0] }}
+    {% else %}
+      {% for option in options %}
+        {% if option == current %}
+          {% set ns.result = options[0] if loop.last else options[loop.index0 + 1] %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.result }}
+    {% endif %}
+  previous_source: >-
+    {% set options = current_source_list if current_source_list is sequence and current_source_list is not string else [] %}
+    {% set current = current_source %}
+    {% set ns = namespace(result='') %}
+    {% if options | count == 0 %}
+      {{ '' }}
+    {% elif current not in options %}
+      {{ options[-1] }}
+    {% else %}
+      {% for option in options %}
+        {% if option == current %}
+          {% set ns.result = options[loop.index0 - 1] %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.result }}
+    {% endif %}
+  next_source: >-
+    {% set options = current_source_list if current_source_list is sequence and current_source_list is not string else [] %}
+    {% set current = current_source %}
+    {% set ns = namespace(result='') %}
+    {% if options | count == 0 %}
+      {{ '' }}
+    {% elif current not in options %}
+      {{ options[0] }}
+    {% else %}
+      {% for option in options %}
+        {% if option == current %}
+          {% set ns.result = options[0] if loop.last else options[loop.index0 + 1] %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.result }}
+    {% endif %}
   selected_action: >-
     {% if event_type == 'button_single' %}
       {{ button_single_action }}
@@ -209,6 +457,46 @@ variables:
     {% endif %}
 
 actions:
+  - if:
+      - condition: template
+        value_template: "{{ current_zone_helper is string and current_zone_helper != '' and configured_zone_media_players | count > 0 and states(current_zone_helper) not in configured_zone_media_players }}"
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: "{{ current_zone_helper }}"
+        data:
+          value: "{{ current_zone_media }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ current_zone_name_helper is string and current_zone_name_helper != '' }}"
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: "{{ current_zone_name_helper }}"
+        data:
+          value: "{{ current_zone_name }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ current_profile_helper is string and current_profile_helper != '' }}"
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: "{{ current_profile_helper }}"
+        data:
+          value: "{{ current_profile }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: "{{ current_source_helper }}"
+        data:
+          value: "{{ current_source }}"
+
   - choose:
       - conditions:
           - condition: template
@@ -216,7 +504,7 @@ actions:
         sequence:
           - action: media_player.turn_on
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
 
       - conditions:
           - condition: template
@@ -224,7 +512,7 @@ actions:
         sequence:
           - action: media_player.turn_off
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
 
       - conditions:
           - condition: template
@@ -232,7 +520,7 @@ actions:
         sequence:
           - action: media_player.volume_mute
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
             data:
               is_volume_muted: true
 
@@ -242,7 +530,7 @@ actions:
         sequence:
           - action: media_player.volume_mute
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
             data:
               is_volume_muted: false
 
@@ -252,7 +540,7 @@ actions:
         sequence:
           - action: media_player.toggle
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
 
       - conditions:
           - condition: template
@@ -260,7 +548,7 @@ actions:
         sequence:
           - action: media_player.media_play_pause
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
 
       - conditions:
           - condition: template
@@ -268,10 +556,10 @@ actions:
         sequence:
           - action: media_player.volume_mute
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
             data:
               is_volume_muted: >-
-                {{ not (state_attr(media_player_entity, 'is_volume_muted') | default(false)) }}
+                {{ not (state_attr(current_zone_media, 'is_volume_muted') | default(false)) }}
 
       - conditions:
           - condition: template
@@ -279,7 +567,7 @@ actions:
         sequence:
           - action: media_player.media_previous_track
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
 
       - conditions:
           - condition: template
@@ -287,7 +575,7 @@ actions:
         sequence:
           - action: media_player.media_next_track
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
 
       - conditions:
           - condition: template
@@ -295,7 +583,7 @@ actions:
         sequence:
           - action: media_player.volume_set
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
             data:
               volume_level: "{{ (default_volume | float(35)) / 100 }}"
 
@@ -305,10 +593,10 @@ actions:
         sequence:
           - action: media_player.volume_set
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
             data:
               volume_level: >-
-                {{ [1.0, (state_attr(media_player_entity, 'volume_level') | float(0)) + volume_step] | min }}
+                {{ [1.0, (state_attr(current_zone_media, 'volume_level') | float(0)) + volume_step] | min }}
 
       - conditions:
           - condition: template
@@ -316,7 +604,153 @@ actions:
         sequence:
           - action: media_player.volume_set
             target:
-              entity_id: !input media_player
+              entity_id: "{{ current_zone_media }}"
             data:
               volume_level: >-
-                {{ [0.0, (state_attr(media_player_entity, 'volume_level') | float(0)) - volume_step] | max }}
+                {{ [0.0, (state_attr(current_zone_media, 'volume_level') | float(0)) - volume_step] | max }}
+
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'zone_prev' and current_zone_helper is string and current_zone_helper != '' and previous_zone_media != '' }}"
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: "{{ current_zone_helper }}"
+            data:
+              value: "{{ previous_zone_media }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_zone_name_helper is string and current_zone_name_helper != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_zone_name_helper }}"
+                data:
+                  value: "{{ previous_zone_name }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_profile_helper is string and current_profile_helper != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_profile_helper }}"
+                data:
+                  value: "{{ previous_zone_profile }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_source_helper }}"
+                data:
+                  value: "{{ previous_zone_source }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'zone_next' and current_zone_helper is string and current_zone_helper != '' and next_zone_media != '' }}"
+        sequence:
+          - action: input_text.set_value
+            target:
+              entity_id: "{{ current_zone_helper }}"
+            data:
+              value: "{{ next_zone_media }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_zone_name_helper is string and current_zone_name_helper != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_zone_name_helper }}"
+                data:
+                  value: "{{ next_zone_name }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_profile_helper is string and current_profile_helper != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_profile_helper }}"
+                data:
+                  value: "{{ next_zone_profile }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_source_helper }}"
+                data:
+                  value: "{{ next_zone_source }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'profile_prev' and current_profile_select is string and current_profile_select != '' }}"
+        sequence:
+          - action: select.select_previous
+            target:
+              entity_id: "{{ current_profile_select }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_profile_helper is string and current_profile_helper != '' and previous_profile != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_profile_helper }}"
+                data:
+                  value: "{{ previous_profile }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'profile_next' and current_profile_select is string and current_profile_select != '' }}"
+        sequence:
+          - action: select.select_next
+            target:
+              entity_id: "{{ current_profile_select }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_profile_helper is string and current_profile_helper != '' and next_profile != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_profile_helper }}"
+                data:
+                  value: "{{ next_profile }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'source_prev' and current_zone_media is string and current_zone_media != '' and previous_source != '' }}"
+        sequence:
+          - action: media_player.select_source
+            target:
+              entity_id: "{{ current_zone_media }}"
+            data:
+              source: "{{ previous_source }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_source_helper }}"
+                data:
+                  value: "{{ previous_source }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ event_type == 'source_next' and current_zone_media is string and current_zone_media != '' and next_source != '' }}"
+        sequence:
+          - action: media_player.select_source
+            target:
+              entity_id: "{{ current_zone_media }}"
+            data:
+              source: "{{ next_source }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+            then:
+              - action: input_text.set_value
+                target:
+                  entity_id: "{{ current_source_helper }}"
+                data:
+                  value: "{{ next_source }}"
