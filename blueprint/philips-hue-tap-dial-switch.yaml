@@ -92,32 +92,34 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
-        button_1_source_select:
-          name: Source Select
+        button_1_source_media:
+          name: Source Media Player
           default: []
+          description: Leave empty to disable source actions for this button.
           selector:
             entity:
               filter:
-                - domain:
-                    - select
+                - integration: genelec
+                  domain:
+                    - media_player
               multiple: false
-        button_1_profile_select:
-          name: Profile Select
+        button_1_profile_device:
+          name: Profile Device
           default: []
+          description: Leave empty to disable profile actions for this button.
           selector:
-            entity:
+            device:
               filter:
-                - domain:
-                    - select
+                - integration: genelec
               multiple: false
-        button_1_led_intensity:
-          name: LED Intensity Number
+        button_1_led_device:
+          name: LED Device
           default: []
+          description: Leave empty to disable LED actions for this button.
           selector:
-            entity:
+            device:
               filter:
-                - domain:
-                    - number
+                - integration: genelec
               multiple: false
         button_1_default_volume:
           name: Default Volume
@@ -238,32 +240,34 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
-        button_2_source_select:
-          name: Source Select
+        button_2_source_media:
+          name: Source Media Player
           default: []
+          description: Leave empty to disable source actions for this button.
           selector:
             entity:
               filter:
-                - domain:
-                    - select
+                - integration: genelec
+                  domain:
+                    - media_player
               multiple: false
-        button_2_profile_select:
-          name: Profile Select
+        button_2_profile_device:
+          name: Profile Device
           default: []
+          description: Leave empty to disable profile actions for this button.
           selector:
-            entity:
+            device:
               filter:
-                - domain:
-                    - select
+                - integration: genelec
               multiple: false
-        button_2_led_intensity:
-          name: LED Intensity Number
+        button_2_led_device:
+          name: LED Device
           default: []
+          description: Leave empty to disable LED actions for this button.
           selector:
-            entity:
+            device:
               filter:
-                - domain:
-                    - number
+                - integration: genelec
               multiple: false
         button_2_default_volume:
           name: Default Volume
@@ -324,32 +328,34 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
-        button_3_source_select:
-          name: Source Select
+        button_3_source_media:
+          name: Source Media Player
           default: []
+          description: Leave empty to disable source actions for this button.
           selector:
             entity:
               filter:
-                - domain:
-                    - select
+                - integration: genelec
+                  domain:
+                    - media_player
               multiple: false
-        button_3_profile_select:
-          name: Profile Select
+        button_3_profile_device:
+          name: Profile Device
           default: []
+          description: Leave empty to disable profile actions for this button.
           selector:
-            entity:
+            device:
               filter:
-                - domain:
-                    - select
+                - integration: genelec
               multiple: false
-        button_3_led_intensity:
-          name: LED Intensity Number
+        button_3_led_device:
+          name: LED Device
           default: []
+          description: Leave empty to disable LED actions for this button.
           selector:
-            entity:
+            device:
               filter:
-                - domain:
-                    - number
+                - integration: genelec
               multiple: false
         button_3_default_volume:
           name: Default Volume
@@ -410,32 +416,34 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
-        button_4_source_select:
-          name: Source Select
+        button_4_source_media:
+          name: Source Media Player
           default: []
+          description: Leave empty to disable source actions for this button.
           selector:
             entity:
               filter:
-                - domain:
-                    - select
+                - integration: genelec
+                  domain:
+                    - media_player
               multiple: false
-        button_4_profile_select:
-          name: Profile Select
+        button_4_profile_device:
+          name: Profile Device
           default: []
+          description: Leave empty to disable profile actions for this button.
           selector:
-            entity:
+            device:
               filter:
-                - domain:
-                    - select
+                - integration: genelec
               multiple: false
-        button_4_led_intensity:
-          name: LED Intensity Number
+        button_4_led_device:
+          name: LED Device
           default: []
+          description: Leave empty to disable LED actions for this button.
           selector:
-            entity:
+            device:
               filter:
-                - domain:
-                    - number
+                - integration: genelec
               multiple: false
         button_4_default_volume:
           name: Default Volume
@@ -504,9 +512,9 @@ variables:
   rotate_right: "{{ command == 'step_with_on_off' and step_mode == 'StepMode.Up' and step_size | int(0) != 255 }}"
 
   button_1_media: !input button_1_media
-  button_1_source_select: !input button_1_source_select
-  button_1_profile_select: !input button_1_profile_select
-  button_1_led_intensity: !input button_1_led_intensity
+  button_1_source_media: !input button_1_source_media
+  button_1_profile_device: !input button_1_profile_device
+  button_1_led_device: !input button_1_led_device
   button_1_default_volume: !input button_1_default_volume
   button_1_short_release_action: !input button_1_short_release_action
   button_1_long_press_action: !input button_1_long_press_action
@@ -515,9 +523,9 @@ variables:
   button_1_rotate_mode: !input button_1_rotate_mode
 
   button_2_media: !input button_2_media
-  button_2_source_select: !input button_2_source_select
-  button_2_profile_select: !input button_2_profile_select
-  button_2_led_intensity: !input button_2_led_intensity
+  button_2_source_media: !input button_2_source_media
+  button_2_profile_device: !input button_2_profile_device
+  button_2_led_device: !input button_2_led_device
   button_2_default_volume: !input button_2_default_volume
   button_2_short_release_action: !input button_2_short_release_action
   button_2_long_press_action: !input button_2_long_press_action
@@ -526,9 +534,9 @@ variables:
   button_2_rotate_mode: !input button_2_rotate_mode
 
   button_3_media: !input button_3_media
-  button_3_source_select: !input button_3_source_select
-  button_3_profile_select: !input button_3_profile_select
-  button_3_led_intensity: !input button_3_led_intensity
+  button_3_source_media: !input button_3_source_media
+  button_3_profile_device: !input button_3_profile_device
+  button_3_led_device: !input button_3_led_device
   button_3_default_volume: !input button_3_default_volume
   button_3_short_release_action: !input button_3_short_release_action
   button_3_long_press_action: !input button_3_long_press_action
@@ -537,9 +545,9 @@ variables:
   button_3_rotate_mode: !input button_3_rotate_mode
 
   button_4_media: !input button_4_media
-  button_4_source_select: !input button_4_source_select
-  button_4_profile_select: !input button_4_profile_select
-  button_4_led_intensity: !input button_4_led_intensity
+  button_4_source_media: !input button_4_source_media
+  button_4_profile_device: !input button_4_profile_device
+  button_4_led_device: !input button_4_led_device
   button_4_default_volume: !input button_4_default_volume
   button_4_short_release_action: !input button_4_short_release_action
   button_4_long_press_action: !input button_4_long_press_action
@@ -550,15 +558,61 @@ variables:
   selected_media: >-
     {% set mapping = {'1': button_1_media, '2': button_2_media, '3': button_3_media, '4': button_4_media} %}
     {{ mapping.get(button_num, '') }}
-  selected_source_select: >-
-    {% set mapping = {'1': button_1_source_select, '2': button_2_source_select, '3': button_3_source_select, '4': button_4_source_select} %}
+  selected_source_media: >-
+    {% set mapping = {'1': button_1_source_media, '2': button_2_source_media, '3': button_3_source_media, '4': button_4_source_media} %}
     {{ mapping.get(button_num, '') }}
   selected_profile_select: >-
-    {% set mapping = {'1': button_1_profile_select, '2': button_2_profile_select, '3': button_3_profile_select, '4': button_4_profile_select} %}
-    {{ mapping.get(button_num, '') }}
+    {% set mapping = {'1': button_1_profile_device, '2': button_2_profile_device, '3': button_3_profile_device, '4': button_4_profile_device} %}
+    {% set device_id = mapping.get(button_num, '') %}
+    {% if device_id is string and device_id != '' %}
+      {{ device_entities(device_id) | select('match', '^select\\..*_profile$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   selected_led_intensity: >-
-    {% set mapping = {'1': button_1_led_intensity, '2': button_2_led_intensity, '3': button_3_led_intensity, '4': button_4_led_intensity} %}
-    {{ mapping.get(button_num, '') }}
+    {% set mapping = {'1': button_1_led_device, '2': button_2_led_device, '3': button_3_led_device, '4': button_4_led_device} %}
+    {% set device_id = mapping.get(button_num, '') %}
+    {% if device_id is string and device_id != '' %}
+      {{ device_entities(device_id) | select('match', '^number\\..*_led_intensity$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  selected_source_list: >-
+    {{ state_attr(selected_source_media, 'source_list') | default([], true) }}
+  selected_source_current: >-
+    {{ state_attr(selected_source_media, 'source') | default('', true) }}
+  selected_source_previous: >-
+    {% set options = selected_source_list if selected_source_list is sequence and selected_source_list is not string else [] %}
+    {% set current = selected_source_current %}
+    {% set ns = namespace(result='') %}
+    {% if options | count == 0 %}
+      {{ '' }}
+    {% elif current not in options %}
+      {{ options[-1] }}
+    {% else %}
+      {% for option in options %}
+        {% if option == current %}
+          {% set ns.result = options[loop.index0 - 1] %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.result }}
+    {% endif %}
+  selected_source_next: >-
+    {% set options = selected_source_list if selected_source_list is sequence and selected_source_list is not string else [] %}
+    {% set current = selected_source_current %}
+    {% set ns = namespace(result='') %}
+    {% if options | count == 0 %}
+      {{ '' }}
+    {% elif current not in options %}
+      {{ options[0] }}
+    {% else %}
+      {% for option in options %}
+        {% if option == current %}
+          {% set ns.result = options[0] if loop.last else options[loop.index0 + 1] %}
+        {% endif %}
+      {% endfor %}
+      {{ ns.result }}
+    {% endif %}
   selected_default_volume: >-
     {% set mapping = {'1': button_1_default_volume, '2': button_2_default_volume, '3': button_3_default_volume, '4': button_4_default_volume} %}
     {{ mapping.get(button_num, 35) }}
@@ -686,100 +740,104 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_analog' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_analog' and selected_source_media is string and selected_source_media != '' }}"
         sequence:
-          - action: select.select_option
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
             data:
-              option: Analog
+              source: "Analog"
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_aoip_01' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_aoip_01' and selected_source_media is string and selected_source_media != '' }}"
         sequence:
-          - action: select.select_option
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
             data:
-              option: AoIP 01
+              source: "AoIP 01"
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_aoip_02' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_aoip_02' and selected_source_media is string and selected_source_media != '' }}"
         sequence:
-          - action: select.select_option
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
             data:
-              option: AoIP 02
+              source: "AoIP 02"
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_analog_aoip_01' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_analog_aoip_01' and selected_source_media is string and selected_source_media != '' }}"
         sequence:
-          - action: select.select_option
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
             data:
-              option: Analog + AoIP 01
+              source: "Analog + AoIP 01"
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_analog_aoip_02' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_analog_aoip_02' and selected_source_media is string and selected_source_media != '' }}"
         sequence:
-          - action: select.select_option
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
             data:
-              option: Analog + AoIP 02
+              source: "Analog + AoIP 02"
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_aoip_12' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_aoip_12' and selected_source_media is string and selected_source_media != '' }}"
         sequence:
-          - action: select.select_option
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
             data:
-              option: AoIP 01 + AoIP 02
+              source: "AoIP 01 + AoIP 02"
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_mix' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_mix' and selected_source_media is string and selected_source_media != '' }}"
         sequence:
-          - action: select.select_option
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
             data:
-              option: Mix
+              source: "Mix"
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_toggle_analog_aoip12' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_toggle_analog_aoip12' and selected_source_media is string and selected_source_media != '' }}"
         sequence:
-          - action: select.select_option
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
             data:
-              option: >-
-                {{ 'AoIP 01 + AoIP 02' if states(selected_source_select) == 'Analog' else 'Analog' }}
+              source: >-
+                {{ 'AoIP 01 + AoIP 02' if selected_source_current == 'Analog' else 'Analog' }}
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_previous' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_previous' and selected_source_media is string and selected_source_media != '' and selected_source_previous != '' }}"
         sequence:
-          - action: select.select_previous
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
+            data:
+              source: "{{ selected_source_previous }}"
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'source_next' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ selected_action == 'source_next' and selected_source_media is string and selected_source_media != '' and selected_source_next != '' }}"
         sequence:
-          - action: select.select_next
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
+            data:
+              source: "{{ selected_source_next }}"
 
       - conditions:
           - condition: template
@@ -839,19 +897,23 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ rotate_left and selected_rotate_mode == 'source' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ rotate_left and selected_rotate_mode == 'source' and selected_source_media is string and selected_source_media != '' and selected_source_previous != '' }}"
         sequence:
-          - action: select.select_previous
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
+            data:
+              source: "{{ selected_source_previous }}"
 
       - conditions:
           - condition: template
-            value_template: "{{ rotate_right and selected_rotate_mode == 'source' and selected_source_select is string and selected_source_select != '' }}"
+            value_template: "{{ rotate_right and selected_rotate_mode == 'source' and selected_source_media is string and selected_source_media != '' and selected_source_next != '' }}"
         sequence:
-          - action: select.select_next
+          - action: media_player.select_source
             target:
-              entity_id: "{{ selected_source_select }}"
+              entity_id: "{{ selected_source_media }}"
+            data:
+              source: "{{ selected_source_next }}"
 
       - conditions:
           - condition: template
