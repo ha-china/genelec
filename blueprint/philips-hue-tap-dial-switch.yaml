@@ -10,8 +10,8 @@ blueprint:
     but simplifies the blueprint to media-only control for this project.
 
     Supported actions:
-    - media power/play/mute controls
-    - volume, previous, next
+    - media power/mute controls
+    - volume
     - Genelec input source presets and source cycling
     - Genelec profile cycling
     - Genelec LED intensity 0 / 100
@@ -125,16 +125,10 @@ blueprint:
                   value: unmute
                 - label: Toggle (Power)
                   value: toggle_power
-                - label: Toggle (Play)
-                  value: toggle_play
                 - label: Toggle (Mute)
                   value: toggle_mute
                 - label: Toggle (Input)
                   value: source_toggle_analog_aoip12
-                - label: Previous Track
-                  value: previous_track
-                - label: Next Track
-                  value: next_track
                 - label: Set Volume
                   value: set_volume
                 - label: Source Analog
@@ -173,14 +167,14 @@ blueprint:
               multiple: false
         button_1_double_press_action:
           name: Double Press
-          default: toggle_play
+          default: none
           selector:
             select:
               options: *media_action_options
               multiple: false
         button_1_triple_press_action:
           name: Triple Press
-          default: previous_track
+          default: none
           selector:
             select:
               options: *media_action_options
@@ -247,14 +241,14 @@ blueprint:
               multiple: false
         button_2_double_press_action:
           name: Double Press
-          default: toggle_play
+          default: none
           selector:
             select:
               options: *media_action_options
               multiple: false
         button_2_triple_press_action:
           name: Triple Press
-          default: previous_track
+          default: none
           selector:
             select:
               options: *media_action_options
@@ -311,14 +305,14 @@ blueprint:
               multiple: false
         button_3_double_press_action:
           name: Double Press
-          default: toggle_play
+          default: none
           selector:
             select:
               options: *media_action_options
               multiple: false
         button_3_triple_press_action:
           name: Triple Press
-          default: previous_track
+          default: none
           selector:
             select:
               options: *media_action_options
@@ -375,14 +369,14 @@ blueprint:
               multiple: false
         button_4_double_press_action:
           name: Double Press
-          default: toggle_play
+          default: none
           selector:
             select:
               options: *media_action_options
               multiple: false
         button_4_triple_press_action:
           name: Triple Press
-          default: previous_track
+          default: none
           selector:
             select:
               options: *media_action_options
@@ -596,14 +590,6 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'toggle_play' and selected_media is string and selected_media != '' }}"
-        sequence:
-          - action: media_player.media_play_pause
-            target:
-              entity_id: "{{ selected_media }}"
-
-      - conditions:
-          - condition: template
             value_template: "{{ selected_action == 'toggle_mute' and selected_media is string and selected_media != '' }}"
         sequence:
           - action: media_player.volume_mute
@@ -611,22 +597,6 @@ actions:
               entity_id: "{{ selected_media }}"
             data:
               is_volume_muted: "{{ not (state_attr(selected_media, 'is_volume_muted') | default(false)) }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'previous_track' and selected_media is string and selected_media != '' }}"
-        sequence:
-          - action: media_player.media_previous_track
-            target:
-              entity_id: "{{ selected_media }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'next_track' and selected_media is string and selected_media != '' }}"
-        sequence:
-          - action: media_player.media_next_track
-            target:
-              entity_id: "{{ selected_media }}"
 
       - conditions:
           - condition: template
