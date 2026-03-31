@@ -4,10 +4,11 @@ blueprint:
     Bind an ESPHome M5Stack Dial event entity to a Home Assistant media player.
 
     Expected event types from ESPHome:
-    - `volume_up`
-    - `volume_down`
-    - `mute_toggle`
-    - `power_toggle`
+    - `button_single`
+    - `button_double`
+    - `button_long`
+    - `rotate_left`
+    - `rotate_right`
   domain: automation
   homeassistant:
     min_version: 2024.10.0
@@ -30,9 +31,20 @@ blueprint:
             - domain:
                 - media_player
           multiple: false
+    default_volume:
+      name: Default Volume
+      description: Used when an action is set to `Set Volume`.
+      default: 35
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
     volume_step:
       name: Volume Step
-      description: Volume step used for each dial detent.
+      description: Used by rotate left/right volume actions.
       default: 0.05
       selector:
         number:
@@ -40,9 +52,126 @@ blueprint:
           max: 0.20
           step: 0.01
           mode: slider
+    button_single_action:
+      name: Button Single Press
+      default: toggle_mute
+      selector:
+        select:
+          options:
+            - label: Do Nothing
+              value: none
+            - label: Turn On
+              value: turn_on
+            - label: Turn Off
+              value: turn_off
+            - label: Mute
+              value: mute
+            - label: Unmute
+              value: unmute
+            - label: Toggle (Power)
+              value: toggle_power
+            - label: Toggle (Play)
+              value: toggle_play
+            - label: Toggle (Mute)
+              value: toggle_mute
+            - label: Previous Track
+              value: previous_track
+            - label: Next Track
+              value: next_track
+            - label: Set Volume
+              value: set_volume
+          multiple: false
+    button_double_action:
+      name: Button Double Press
+      default: toggle_play
+      selector:
+        select:
+          options:
+            - label: Do Nothing
+              value: none
+            - label: Turn On
+              value: turn_on
+            - label: Turn Off
+              value: turn_off
+            - label: Mute
+              value: mute
+            - label: Unmute
+              value: unmute
+            - label: Toggle (Power)
+              value: toggle_power
+            - label: Toggle (Play)
+              value: toggle_play
+            - label: Toggle (Mute)
+              value: toggle_mute
+            - label: Previous Track
+              value: previous_track
+            - label: Next Track
+              value: next_track
+            - label: Set Volume
+              value: set_volume
+          multiple: false
+    button_long_action:
+      name: Button Long Press
+      default: toggle_power
+      selector:
+        select:
+          options:
+            - label: Do Nothing
+              value: none
+            - label: Turn On
+              value: turn_on
+            - label: Turn Off
+              value: turn_off
+            - label: Mute
+              value: mute
+            - label: Unmute
+              value: unmute
+            - label: Toggle (Power)
+              value: toggle_power
+            - label: Toggle (Play)
+              value: toggle_play
+            - label: Toggle (Mute)
+              value: toggle_mute
+            - label: Previous Track
+              value: previous_track
+            - label: Next Track
+              value: next_track
+            - label: Set Volume
+              value: set_volume
+          multiple: false
+    rotate_left_action:
+      name: Rotate Left
+      default: volume_down
+      selector:
+        select:
+          options:
+            - label: Do Nothing
+              value: none
+            - label: Volume Down
+              value: volume_down
+            - label: Previous Track
+              value: previous_track
+            - label: Next Track
+              value: next_track
+          multiple: false
+    rotate_right_action:
+      name: Rotate Right
+      default: volume_up
+      selector:
+        select:
+          options:
+            - label: Do Nothing
+              value: none
+            - label: Volume Up
+              value: volume_up
+            - label: Previous Track
+              value: previous_track
+            - label: Next Track
+              value: next_track
+          multiple: false
 
-mode: parallel
-max: 20
+mode: queued
+max: 50
 
 triggers:
   - trigger: state
@@ -56,36 +185,86 @@ triggers:
 
 variables:
   media_player_entity: !input media_player
+  default_volume: !input default_volume
   volume_step: !input volume_step
+  button_single_action: !input button_single_action
+  button_double_action: !input button_double_action
+  button_long_action: !input button_long_action
+  rotate_left_action: !input rotate_left_action
+  rotate_right_action: !input rotate_right_action
   event_type: "{{ trigger.to_state.attributes.event_type | default('') }}"
+  selected_action: >-
+    {% if event_type == 'button_single' %}
+      {{ button_single_action }}
+    {% elif event_type == 'button_double' %}
+      {{ button_double_action }}
+    {% elif event_type == 'button_long' %}
+      {{ button_long_action }}
+    {% elif event_type == 'rotate_left' %}
+      {{ rotate_left_action }}
+    {% elif event_type == 'rotate_right' %}
+      {{ rotate_right_action }}
+    {% else %}
+      none
+    {% endif %}
 
 actions:
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ event_type == 'volume_up' }}"
+            value_template: "{{ selected_action == 'turn_on' }}"
         sequence:
-          - action: media_player.volume_set
+          - action: media_player.turn_on
             target:
               entity_id: !input media_player
-            data:
-              volume_level: >-
-                {{ [1.0, (state_attr(media_player_entity, 'volume_level') | float(0)) + volume_step] | min }}
 
       - conditions:
           - condition: template
-            value_template: "{{ event_type == 'volume_down' }}"
+            value_template: "{{ selected_action == 'turn_off' }}"
         sequence:
-          - action: media_player.volume_set
+          - action: media_player.turn_off
             target:
               entity_id: !input media_player
-            data:
-              volume_level: >-
-                {{ [0.0, (state_attr(media_player_entity, 'volume_level') | float(0)) - volume_step] | max }}
 
       - conditions:
           - condition: template
-            value_template: "{{ event_type == 'mute_toggle' }}"
+            value_template: "{{ selected_action == 'mute' }}"
+        sequence:
+          - action: media_player.volume_mute
+            target:
+              entity_id: !input media_player
+            data:
+              is_volume_muted: true
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'unmute' }}"
+        sequence:
+          - action: media_player.volume_mute
+            target:
+              entity_id: !input media_player
+            data:
+              is_volume_muted: false
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'toggle_power' }}"
+        sequence:
+          - action: media_player.toggle
+            target:
+              entity_id: !input media_player
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'toggle_play' }}"
+        sequence:
+          - action: media_player.media_play_pause
+            target:
+              entity_id: !input media_player
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'toggle_mute' }}"
         sequence:
           - action: media_player.volume_mute
             target:
@@ -96,8 +275,48 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ event_type == 'power_toggle' }}"
+            value_template: "{{ selected_action == 'previous_track' }}"
         sequence:
-          - action: media_player.toggle
+          - action: media_player.media_previous_track
             target:
               entity_id: !input media_player
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'next_track' }}"
+        sequence:
+          - action: media_player.media_next_track
+            target:
+              entity_id: !input media_player
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'set_volume' }}"
+        sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: !input media_player
+            data:
+              volume_level: "{{ (default_volume | float(35)) / 100 }}"
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'volume_up' }}"
+        sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: !input media_player
+            data:
+              volume_level: >-
+                {{ [1.0, (state_attr(media_player_entity, 'volume_level') | float(0)) + volume_step] | min }}
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'volume_down' }}"
+        sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: !input media_player
+            data:
+              volume_level: >-
+                {{ [0.0, (state_attr(media_player_entity, 'volume_level') | float(0)) - volume_step] | max }}
