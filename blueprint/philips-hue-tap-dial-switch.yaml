@@ -92,35 +92,11 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
-        button_1_source_media:
-          name: Source Media Player
-          default: []
-          description: Leave empty to disable source actions for this button.
+        button_1_default_volume_enabled:
+          name: Enable Default Volume
+          default: false
           selector:
-            entity:
-              filter:
-                - integration: genelec
-                  domain:
-                    - media_player
-              multiple: false
-        button_1_profile_device:
-          name: Profile Device
-          default: []
-          description: Leave empty to disable profile actions for this button.
-          selector:
-            device:
-              filter:
-                - integration: genelec
-              multiple: false
-        button_1_led_device:
-          name: LED Device
-          default: []
-          description: Leave empty to disable LED actions for this button.
-          selector:
-            device:
-              filter:
-                - integration: genelec
-              multiple: false
+            boolean: {}
         button_1_default_volume:
           name: Default Volume
           default: 35
@@ -240,35 +216,11 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
-        button_2_source_media:
-          name: Source Media Player
-          default: []
-          description: Leave empty to disable source actions for this button.
+        button_2_default_volume_enabled:
+          name: Enable Default Volume
+          default: false
           selector:
-            entity:
-              filter:
-                - integration: genelec
-                  domain:
-                    - media_player
-              multiple: false
-        button_2_profile_device:
-          name: Profile Device
-          default: []
-          description: Leave empty to disable profile actions for this button.
-          selector:
-            device:
-              filter:
-                - integration: genelec
-              multiple: false
-        button_2_led_device:
-          name: LED Device
-          default: []
-          description: Leave empty to disable LED actions for this button.
-          selector:
-            device:
-              filter:
-                - integration: genelec
-              multiple: false
+            boolean: {}
         button_2_default_volume:
           name: Default Volume
           default: 35
@@ -328,35 +280,11 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
-        button_3_source_media:
-          name: Source Media Player
-          default: []
-          description: Leave empty to disable source actions for this button.
+        button_3_default_volume_enabled:
+          name: Enable Default Volume
+          default: false
           selector:
-            entity:
-              filter:
-                - integration: genelec
-                  domain:
-                    - media_player
-              multiple: false
-        button_3_profile_device:
-          name: Profile Device
-          default: []
-          description: Leave empty to disable profile actions for this button.
-          selector:
-            device:
-              filter:
-                - integration: genelec
-              multiple: false
-        button_3_led_device:
-          name: LED Device
-          default: []
-          description: Leave empty to disable LED actions for this button.
-          selector:
-            device:
-              filter:
-                - integration: genelec
-              multiple: false
+            boolean: {}
         button_3_default_volume:
           name: Default Volume
           default: 35
@@ -416,35 +344,11 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
-        button_4_source_media:
-          name: Source Media Player
-          default: []
-          description: Leave empty to disable source actions for this button.
+        button_4_default_volume_enabled:
+          name: Enable Default Volume
+          default: false
           selector:
-            entity:
-              filter:
-                - integration: genelec
-                  domain:
-                    - media_player
-              multiple: false
-        button_4_profile_device:
-          name: Profile Device
-          default: []
-          description: Leave empty to disable profile actions for this button.
-          selector:
-            device:
-              filter:
-                - integration: genelec
-              multiple: false
-        button_4_led_device:
-          name: LED Device
-          default: []
-          description: Leave empty to disable LED actions for this button.
-          selector:
-            device:
-              filter:
-                - integration: genelec
-              multiple: false
+            boolean: {}
         button_4_default_volume:
           name: Default Volume
           default: 35
@@ -512,9 +416,7 @@ variables:
   rotate_right: "{{ command == 'step_with_on_off' and step_mode == 'StepMode.Up' and step_size | int(0) != 255 }}"
 
   button_1_media: !input button_1_media
-  button_1_source_media: !input button_1_source_media
-  button_1_profile_device: !input button_1_profile_device
-  button_1_led_device: !input button_1_led_device
+  button_1_default_volume_enabled: !input button_1_default_volume_enabled
   button_1_default_volume: !input button_1_default_volume
   button_1_short_release_action: !input button_1_short_release_action
   button_1_long_press_action: !input button_1_long_press_action
@@ -523,9 +425,7 @@ variables:
   button_1_rotate_mode: !input button_1_rotate_mode
 
   button_2_media: !input button_2_media
-  button_2_source_media: !input button_2_source_media
-  button_2_profile_device: !input button_2_profile_device
-  button_2_led_device: !input button_2_led_device
+  button_2_default_volume_enabled: !input button_2_default_volume_enabled
   button_2_default_volume: !input button_2_default_volume
   button_2_short_release_action: !input button_2_short_release_action
   button_2_long_press_action: !input button_2_long_press_action
@@ -534,9 +434,7 @@ variables:
   button_2_rotate_mode: !input button_2_rotate_mode
 
   button_3_media: !input button_3_media
-  button_3_source_media: !input button_3_source_media
-  button_3_profile_device: !input button_3_profile_device
-  button_3_led_device: !input button_3_led_device
+  button_3_default_volume_enabled: !input button_3_default_volume_enabled
   button_3_default_volume: !input button_3_default_volume
   button_3_short_release_action: !input button_3_short_release_action
   button_3_long_press_action: !input button_3_long_press_action
@@ -545,9 +443,7 @@ variables:
   button_3_rotate_mode: !input button_3_rotate_mode
 
   button_4_media: !input button_4_media
-  button_4_source_media: !input button_4_source_media
-  button_4_profile_device: !input button_4_profile_device
-  button_4_led_device: !input button_4_led_device
+  button_4_default_volume_enabled: !input button_4_default_volume_enabled
   button_4_default_volume: !input button_4_default_volume
   button_4_short_release_action: !input button_4_short_release_action
   button_4_long_press_action: !input button_4_long_press_action
@@ -558,22 +454,23 @@ variables:
   selected_media: >-
     {% set mapping = {'1': button_1_media, '2': button_2_media, '3': button_3_media, '4': button_4_media} %}
     {{ mapping.get(button_num, '') }}
+  selected_media_device: >-
+    {% if selected_media is string and selected_media != '' %}
+      {{ device_id(selected_media) | default('', true) }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   selected_source_media: >-
-    {% set mapping = {'1': button_1_source_media, '2': button_2_source_media, '3': button_3_source_media, '4': button_4_source_media} %}
-    {{ mapping.get(button_num, '') }}
+    {{ selected_media }}
   selected_profile_select: >-
-    {% set mapping = {'1': button_1_profile_device, '2': button_2_profile_device, '3': button_3_profile_device, '4': button_4_profile_device} %}
-    {% set device_id = mapping.get(button_num, '') %}
-    {% if device_id is string and device_id != '' %}
-      {{ device_entities(device_id) | select('match', '^select\\..*_profile$') | list | first | default('') }}
+    {% if selected_media_device is string and selected_media_device != '' %}
+      {{ device_entities(selected_media_device) | select('match', '^select\\..*_profile$') | list | first | default('') }}
     {% else %}
       {{ '' }}
     {% endif %}
   selected_led_intensity: >-
-    {% set mapping = {'1': button_1_led_device, '2': button_2_led_device, '3': button_3_led_device, '4': button_4_led_device} %}
-    {% set device_id = mapping.get(button_num, '') %}
-    {% if device_id is string and device_id != '' %}
-      {{ device_entities(device_id) | select('match', '^number\\..*_led_intensity$') | list | first | default('') }}
+    {% if selected_media_device is string and selected_media_device != '' %}
+      {{ device_entities(selected_media_device) | select('match', '^number\\..*_led_intensity$') | list | first | default('') }}
     {% else %}
       {{ '' }}
     {% endif %}
@@ -616,6 +513,9 @@ variables:
   selected_default_volume: >-
     {% set mapping = {'1': button_1_default_volume, '2': button_2_default_volume, '3': button_3_default_volume, '4': button_4_default_volume} %}
     {{ mapping.get(button_num, 35) }}
+  selected_default_volume_enabled: >-
+    {% set mapping = {'1': button_1_default_volume_enabled, '2': button_2_default_volume_enabled, '3': button_3_default_volume_enabled, '4': button_4_default_volume_enabled} %}
+    {{ mapping.get(button_num, false) }}
   selected_rotate_mode: >-
     {% set mapping = {'1': button_1_rotate_mode, '2': button_2_rotate_mode, '3': button_3_rotate_mode, '4': button_4_rotate_mode} %}
     {{ mapping.get(button_num, 'none') }}
@@ -730,7 +630,7 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'set_volume' and selected_media is string and selected_media != '' }}"
+            value_template: "{{ selected_action == 'set_volume' and selected_media is string and selected_media != '' and selected_default_volume_enabled }}"
         sequence:
           - action: media_player.volume_set
             target:
