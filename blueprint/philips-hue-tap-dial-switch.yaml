@@ -30,6 +30,7 @@ blueprint:
           - Added: Genelec source preset actions
           - Added: Genelec source/profile cycling actions
           - Added: Genelec LED intensity 0 / 100 actions
+          - Added: Genelec input toggle between Analog and AoIP 01 + AoIP 02
           - Improved: Kept original last-pressed dial workflow for media control
           - Credit: Adapted from Daniel Petrovic's original blueprint
       collapsed: true
@@ -150,6 +151,8 @@ blueprint:
                   value: toggle_play
                 - label: Toggle (Mute)
                   value: toggle_mute
+                - label: Toggle (Input)
+                  value: source_toggle_analog_aoip12
                 - label: Previous Track
                   value: previous_track
                 - label: Next Track
@@ -750,6 +753,17 @@ actions:
               entity_id: "{{ selected_source_select }}"
             data:
               option: Mix
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'source_toggle_analog_aoip12' and selected_source_select is string and selected_source_select != '' }}"
+        sequence:
+          - action: select.select_option
+            target:
+              entity_id: "{{ selected_source_select }}"
+            data:
+              option: >-
+                {{ 'AoIP 01 + AoIP 02' if states(selected_source_select) == 'Analog' else 'Analog' }}
 
       - conditions:
           - condition: template

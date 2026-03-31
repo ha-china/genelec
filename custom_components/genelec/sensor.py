@@ -101,11 +101,8 @@ async def async_setup_entry(
             GenelecDanteLockedSensor(device, device_info, coordinator, aoip_identity),
             GenelecDanteNameSensor(device, device_info, coordinator, aoip_identity),
             GenelecModelConfigSensor(device, device_info, coordinator, device_id),
-            GenelecBuildSensor(device, device_info, coordinator),
-            GenelecBaseIdSensor(device, device_info, coordinator),
             GenelecTechnologySensor(device, device_info, coordinator),
             GenelecUpgradeIdSensor(device, device_info, coordinator),
-            GenelecConfirmFwUpdateSensor(device, device_info, coordinator),
             GenelecCurrentProfileSensor(device, device_info, coordinator, profile_list),
             GenelecStartupProfileSensor(device, device_info, coordinator, profile_list),
         ]
