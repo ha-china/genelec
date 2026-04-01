@@ -109,7 +109,8 @@ blueprint:
               mode: slider
         button_1_short_release_action:
           name: Short Release
-          default: toggle_mute
+          default:
+            - toggle_mute
           selector:
             select:
               options: &media_action_options
@@ -159,28 +160,29 @@ blueprint:
                   value: led_0
                 - label: LED 100
                   value: led_100
-              multiple: false
+              multiple: true
         button_1_long_press_action:
           name: Long Press
-          default: toggle_power
+          default:
+            - toggle_power
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_1_double_press_action:
           name: Double Press
-          default: none
+          default: []
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_1_triple_press_action:
           name: Triple Press
-          default: none
+          default: []
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_1_rotate_mode:
           name: Rotate Mode
           default: volume
@@ -229,32 +231,34 @@ blueprint:
               mode: slider
         button_2_short_release_action:
           name: Short Release
-          default: toggle_mute
+          default:
+            - toggle_mute
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_2_long_press_action:
           name: Long Press
-          default: toggle_power
+          default:
+            - toggle_power
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_2_double_press_action:
           name: Double Press
-          default: none
+          default: []
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_2_triple_press_action:
           name: Triple Press
-          default: none
+          default: []
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_2_rotate_mode:
           name: Rotate Mode
           default: volume
@@ -293,32 +297,34 @@ blueprint:
               mode: slider
         button_3_short_release_action:
           name: Short Release
-          default: toggle_mute
+          default:
+            - toggle_mute
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_3_long_press_action:
           name: Long Press
-          default: toggle_power
+          default:
+            - toggle_power
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_3_double_press_action:
           name: Double Press
-          default: none
+          default: []
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_3_triple_press_action:
           name: Triple Press
-          default: none
+          default: []
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_3_rotate_mode:
           name: Rotate Mode
           default: volume
@@ -357,32 +363,34 @@ blueprint:
               mode: slider
         button_4_short_release_action:
           name: Short Release
-          default: toggle_mute
+          default:
+            - toggle_mute
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_4_long_press_action:
           name: Long Press
-          default: toggle_power
+          default:
+            - toggle_power
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_4_double_press_action:
           name: Double Press
-          default: none
+          default: []
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_4_triple_press_action:
           name: Triple Press
-          default: none
+          default: []
           selector:
             select:
               options: *media_action_options
-              multiple: false
+              multiple: true
         button_4_rotate_mode:
           name: Rotate Mode
           default: volume
@@ -563,7 +571,7 @@ variables:
     {% else %}
       {{ 'none' }}
     {% endif %}
-  selected_action: >-
+  selected_actions: >-
     {% set key = (command | regex_replace(find='[^1-4]', replace='') if command is string and command | regex_search('button_[1-4]') else states(last_pressed) if command == 'step_with_on_off' and states(last_pressed) in ['1', '2', '3', '4'] else '') | string | trim %}
     {% if command == 'button_' ~ key ~ '_short_release' %}
       {% if key == '1' %}{{ button_1_short_release_action }}{% elif key == '2' %}{{ button_2_short_release_action }}{% elif key == '3' %}{{ button_3_short_release_action }}{% elif key == '4' %}{{ button_4_short_release_action }}{% else %}none{% endif %}
@@ -574,7 +582,7 @@ variables:
     {% elif command == 'button_' ~ key ~ '_triple_press' %}
       {% if key == '1' %}{{ button_1_triple_press_action }}{% elif key == '2' %}{{ button_2_triple_press_action }}{% elif key == '3' %}{{ button_3_triple_press_action }}{% elif key == '4' %}{{ button_4_triple_press_action }}{% else %}none{% endif %}
     {% else %}
-      none
+      []
     {% endif %}
   selected_current_volume: >-
     {{ state_attr(selected_media, 'volume_level') | default((selected_default_volume | float(35)) / 100, true) }}
@@ -590,219 +598,223 @@ actions:
         data:
           value: "{{ button_num }}"
 
+  - repeat:
+      for_each: "{{ selected_actions if selected_actions is sequence and selected_actions is not string else [] }}"
+      sequence:
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'turn_on' and selected_media is string and selected_media != '' }}"
+              sequence:
+                - action: media_player.turn_on
+                  target:
+                    entity_id: "{{ selected_media }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'turn_off' and selected_media is string and selected_media != '' }}"
+              sequence:
+                - action: media_player.turn_off
+                  target:
+                    entity_id: "{{ selected_media }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'mute' and selected_media is string and selected_media != '' }}"
+              sequence:
+                - action: media_player.volume_mute
+                  target:
+                    entity_id: "{{ selected_media }}"
+                  data:
+                    is_volume_muted: true
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'unmute' and selected_media is string and selected_media != '' }}"
+              sequence:
+                - action: media_player.volume_mute
+                  target:
+                    entity_id: "{{ selected_media }}"
+                  data:
+                    is_volume_muted: false
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'toggle_power' and selected_media is string and selected_media != '' }}"
+              sequence:
+                - action: media_player.toggle
+                  target:
+                    entity_id: "{{ selected_media }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'toggle_mute' and selected_media is string and selected_media != '' }}"
+              sequence:
+                - action: media_player.volume_mute
+                  target:
+                    entity_id: "{{ selected_media }}"
+                  data:
+                    is_volume_muted: "{{ not (state_attr(selected_media, 'is_volume_muted') | default(false)) }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'set_volume' and selected_media is string and selected_media != '' and selected_default_volume_enabled }}"
+              sequence:
+                - action: media_player.volume_set
+                  target:
+                    entity_id: "{{ selected_media }}"
+                  data:
+                    volume_level: "{{ (selected_default_volume | float(35)) / 100 }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_analog' and selected_source_media is string and selected_source_media != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: "Analog"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_aoip_01' and selected_source_media is string and selected_source_media != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: "AoIP 01"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_aoip_02' and selected_source_media is string and selected_source_media != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: "AoIP 02"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_analog_aoip_01' and selected_source_media is string and selected_source_media != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: "Analog + AoIP 01"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_analog_aoip_02' and selected_source_media is string and selected_source_media != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: "Analog + AoIP 02"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_aoip_12' and selected_source_media is string and selected_source_media != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: "AoIP 01 + AoIP 02"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_mix' and selected_source_media is string and selected_source_media != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: "Mix"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_toggle_analog_aoip12' and selected_source_media is string and selected_source_media != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: >-
+                      {{ 'AoIP 01 + AoIP 02' if selected_source_current == 'Analog' else 'Analog' }}
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_toggle_aoip12' and selected_source_media is string and selected_source_media != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: >-
+                      {{ 'AoIP 02' if selected_source_current == 'AoIP 01' else 'AoIP 01' }}
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_previous' and selected_source_media is string and selected_source_media != '' and selected_source_previous != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: "{{ selected_source_previous }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'source_next' and selected_source_media is string and selected_source_media != '' and selected_source_next != '' }}"
+              sequence:
+                - action: media_player.select_source
+                  target:
+                    entity_id: "{{ selected_source_media }}"
+                  data:
+                    source: "{{ selected_source_next }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'profile_previous' and selected_profile_select is string and selected_profile_select != '' }}"
+              sequence:
+                - action: select.select_previous
+                  target:
+                    entity_id: "{{ selected_profile_select }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'profile_next' and selected_profile_select is string and selected_profile_select != '' }}"
+              sequence:
+                - action: select.select_next
+                  target:
+                    entity_id: "{{ selected_profile_select }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'led_0' and selected_led_intensity is string and selected_led_intensity != '' }}"
+              sequence:
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ selected_led_intensity }}"
+                  data:
+                    value: 0
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'led_100' and selected_led_intensity is string and selected_led_intensity != '' }}"
+              sequence:
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ selected_led_intensity }}"
+                  data:
+                    value: 100
+
   - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'turn_on' and selected_media is string and selected_media != '' }}"
-        sequence:
-          - action: media_player.turn_on
-            target:
-              entity_id: "{{ selected_media }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'turn_off' and selected_media is string and selected_media != '' }}"
-        sequence:
-          - action: media_player.turn_off
-            target:
-              entity_id: "{{ selected_media }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'mute' and selected_media is string and selected_media != '' }}"
-        sequence:
-          - action: media_player.volume_mute
-            target:
-              entity_id: "{{ selected_media }}"
-            data:
-              is_volume_muted: true
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'unmute' and selected_media is string and selected_media != '' }}"
-        sequence:
-          - action: media_player.volume_mute
-            target:
-              entity_id: "{{ selected_media }}"
-            data:
-              is_volume_muted: false
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'toggle_power' and selected_media is string and selected_media != '' }}"
-        sequence:
-          - action: media_player.toggle
-            target:
-              entity_id: "{{ selected_media }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'toggle_mute' and selected_media is string and selected_media != '' }}"
-        sequence:
-          - action: media_player.volume_mute
-            target:
-              entity_id: "{{ selected_media }}"
-            data:
-              is_volume_muted: "{{ not (state_attr(selected_media, 'is_volume_muted') | default(false)) }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'set_volume' and selected_media is string and selected_media != '' and selected_default_volume_enabled }}"
-        sequence:
-          - action: media_player.volume_set
-            target:
-              entity_id: "{{ selected_media }}"
-            data:
-              volume_level: "{{ (selected_default_volume | float(35)) / 100 }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_analog' and selected_source_media is string and selected_source_media != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: "Analog"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_aoip_01' and selected_source_media is string and selected_source_media != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: "AoIP 01"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_aoip_02' and selected_source_media is string and selected_source_media != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: "AoIP 02"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_analog_aoip_01' and selected_source_media is string and selected_source_media != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: "Analog + AoIP 01"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_analog_aoip_02' and selected_source_media is string and selected_source_media != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: "Analog + AoIP 02"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_aoip_12' and selected_source_media is string and selected_source_media != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: "AoIP 01 + AoIP 02"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_mix' and selected_source_media is string and selected_source_media != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: "Mix"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_toggle_analog_aoip12' and selected_source_media is string and selected_source_media != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: >-
-                {{ 'AoIP 01 + AoIP 02' if selected_source_current == 'Analog' else 'Analog' }}
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_toggle_aoip12' and selected_source_media is string and selected_source_media != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: >-
-                {{ 'AoIP 02' if selected_source_current == 'AoIP 01' else 'AoIP 01' }}
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_previous' and selected_source_media is string and selected_source_media != '' and selected_source_previous != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: "{{ selected_source_previous }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'source_next' and selected_source_media is string and selected_source_media != '' and selected_source_next != '' }}"
-        sequence:
-          - action: media_player.select_source
-            target:
-              entity_id: "{{ selected_source_media }}"
-            data:
-              source: "{{ selected_source_next }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'profile_previous' and selected_profile_select is string and selected_profile_select != '' }}"
-        sequence:
-          - action: select.select_previous
-            target:
-              entity_id: "{{ selected_profile_select }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'profile_next' and selected_profile_select is string and selected_profile_select != '' }}"
-        sequence:
-          - action: select.select_next
-            target:
-              entity_id: "{{ selected_profile_select }}"
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'led_0' and selected_led_intensity is string and selected_led_intensity != '' }}"
-        sequence:
-          - action: number.set_value
-            target:
-              entity_id: "{{ selected_led_intensity }}"
-            data:
-              value: 0
-
-      - conditions:
-          - condition: template
-            value_template: "{{ selected_action == 'led_100' and selected_led_intensity is string and selected_led_intensity != '' }}"
-        sequence:
-          - action: number.set_value
-            target:
-              entity_id: "{{ selected_led_intensity }}"
-            data:
-              value: 100
-
       - conditions:
           - condition: template
             value_template: "{{ rotate_left and selected_rotate_mode == 'volume' and selected_media is string and selected_media != '' }}"
