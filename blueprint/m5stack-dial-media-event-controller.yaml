@@ -58,35 +58,35 @@ blueprint:
             - domain:
                 - input_text
           multiple: false
-    current_zone_name_helper:
-      name: Current Zone Name Input Text
-      description: Optional input_text helper used to expose the selected zone name to ESPHome.
+    current_zone_text:
+      name: Current Zone Text
+      description: Optional ESPHome text entity used to expose the selected zone name to the M5 display.
       default: []
       selector:
         entity:
           filter:
             - domain:
-                - input_text
+                - text
           multiple: false
-    current_profile_helper:
-      name: Current Profile Input Text
-      description: Optional input_text helper used to expose the current profile to ESPHome.
+    current_profile_text:
+      name: Current Profile Text
+      description: Optional ESPHome text entity used to expose the current profile to the M5 display.
       default: []
       selector:
         entity:
           filter:
             - domain:
-                - input_text
+                - text
           multiple: false
-    current_source_helper:
-      name: Current Source Input Text
-      description: Optional input_text helper used to expose the current source to ESPHome.
+    current_source_text:
+      name: Current Source Text
+      description: Optional ESPHome text entity used to expose the current source to the M5 display.
       default: []
       selector:
         entity:
           filter:
             - domain:
-                - input_text
+                - text
           multiple: false
     default_volume:
       name: Default Volume
@@ -244,9 +244,9 @@ variables:
   media_player_entity: !input media_player
   zone_media_players: !input zone_media_players
   current_zone_helper: !input current_zone_helper
-  current_zone_name_helper: !input current_zone_name_helper
-  current_profile_helper: !input current_profile_helper
-  current_source_helper: !input current_source_helper
+  current_zone_text: !input current_zone_text
+  current_profile_text: !input current_profile_text
+  current_source_text: !input current_source_text
   default_volume: !input default_volume
   volume_step: !input volume_step
   button_single_action: !input button_single_action
@@ -469,31 +469,31 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ current_zone_name_helper is string and current_zone_name_helper != '' }}"
+        value_template: "{{ current_zone_text is string and current_zone_text != '' }}"
     then:
-      - action: input_text.set_value
+      - action: text.set_value
         target:
-          entity_id: "{{ current_zone_name_helper }}"
+          entity_id: "{{ current_zone_text }}"
         data:
           value: "{{ current_zone_name }}"
 
   - if:
       - condition: template
-        value_template: "{{ current_profile_helper is string and current_profile_helper != '' }}"
+        value_template: "{{ current_profile_text is string and current_profile_text != '' }}"
     then:
-      - action: input_text.set_value
+      - action: text.set_value
         target:
-          entity_id: "{{ current_profile_helper }}"
+          entity_id: "{{ current_profile_text }}"
         data:
           value: "{{ current_profile }}"
 
   - if:
       - condition: template
-        value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+        value_template: "{{ current_source_text is string and current_source_text != '' }}"
     then:
-      - action: input_text.set_value
+      - action: text.set_value
         target:
-          entity_id: "{{ current_source_helper }}"
+          entity_id: "{{ current_source_text }}"
         data:
           value: "{{ current_source }}"
 
@@ -620,29 +620,29 @@ actions:
               value: "{{ previous_zone_media }}"
           - if:
               - condition: template
-                value_template: "{{ current_zone_name_helper is string and current_zone_name_helper != '' }}"
+                value_template: "{{ current_zone_text is string and current_zone_text != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_zone_name_helper }}"
+                  entity_id: "{{ current_zone_text }}"
                 data:
                   value: "{{ previous_zone_name }}"
           - if:
               - condition: template
-                value_template: "{{ current_profile_helper is string and current_profile_helper != '' }}"
+                value_template: "{{ current_profile_text is string and current_profile_text != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_profile_helper }}"
+                  entity_id: "{{ current_profile_text }}"
                 data:
                   value: "{{ previous_zone_profile }}"
           - if:
               - condition: template
-                value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+                value_template: "{{ current_source_text is string and current_source_text != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_source_helper }}"
+                  entity_id: "{{ current_source_text }}"
                 data:
                   value: "{{ previous_zone_source }}"
 
@@ -657,29 +657,29 @@ actions:
               value: "{{ next_zone_media }}"
           - if:
               - condition: template
-                value_template: "{{ current_zone_name_helper is string and current_zone_name_helper != '' }}"
+                value_template: "{{ current_zone_text is string and current_zone_text != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_zone_name_helper }}"
+                  entity_id: "{{ current_zone_text }}"
                 data:
                   value: "{{ next_zone_name }}"
           - if:
               - condition: template
-                value_template: "{{ current_profile_helper is string and current_profile_helper != '' }}"
+                value_template: "{{ current_profile_text is string and current_profile_text != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_profile_helper }}"
+                  entity_id: "{{ current_profile_text }}"
                 data:
                   value: "{{ next_zone_profile }}"
           - if:
               - condition: template
-                value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+                value_template: "{{ current_source_text is string and current_source_text != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_source_helper }}"
+                  entity_id: "{{ current_source_text }}"
                 data:
                   value: "{{ next_zone_source }}"
 
@@ -692,11 +692,11 @@ actions:
               entity_id: "{{ current_profile_select }}"
           - if:
               - condition: template
-                value_template: "{{ current_profile_helper is string and current_profile_helper != '' and previous_profile != '' }}"
+                value_template: "{{ current_profile_text is string and current_profile_text != '' and previous_profile != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_profile_helper }}"
+                  entity_id: "{{ current_profile_text }}"
                 data:
                   value: "{{ previous_profile }}"
 
@@ -709,11 +709,11 @@ actions:
               entity_id: "{{ current_profile_select }}"
           - if:
               - condition: template
-                value_template: "{{ current_profile_helper is string and current_profile_helper != '' and next_profile != '' }}"
+                value_template: "{{ current_profile_text is string and current_profile_text != '' and next_profile != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_profile_helper }}"
+                  entity_id: "{{ current_profile_text }}"
                 data:
                   value: "{{ next_profile }}"
 
@@ -728,11 +728,11 @@ actions:
               source: "{{ previous_source }}"
           - if:
               - condition: template
-                value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+                value_template: "{{ current_source_text is string and current_source_text != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_source_helper }}"
+                  entity_id: "{{ current_source_text }}"
                 data:
                   value: "{{ previous_source }}"
 
@@ -747,10 +747,10 @@ actions:
               source: "{{ next_source }}"
           - if:
               - condition: template
-                value_template: "{{ current_source_helper is string and current_source_helper != '' }}"
+                value_template: "{{ current_source_text is string and current_source_text != '' }}"
             then:
-              - action: input_text.set_value
+              - action: text.set_value
                 target:
-                  entity_id: "{{ current_source_helper }}"
+                  entity_id: "{{ current_source_text }}"
                 data:
                   value: "{{ next_source }}"
