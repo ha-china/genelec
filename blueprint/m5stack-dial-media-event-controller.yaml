@@ -58,36 +58,6 @@ blueprint:
             - domain:
                 - input_text
           multiple: false
-    current_zone_text:
-      name: Current Zone Text
-      description: Optional ESPHome text entity used to expose the selected zone name to the M5 display.
-      default: []
-      selector:
-        entity:
-          filter:
-            - domain:
-                - text
-          multiple: false
-    current_profile_text:
-      name: Current Profile Text
-      description: Optional ESPHome text entity used to expose the current profile to the M5 display.
-      default: []
-      selector:
-        entity:
-          filter:
-            - domain:
-                - text
-          multiple: false
-    current_source_text:
-      name: Current Source Text
-      description: Optional ESPHome text entity used to expose the current source to the M5 display.
-      default: []
-      selector:
-        entity:
-          filter:
-            - domain:
-                - text
-          multiple: false
     default_volume:
       name: Default Volume
       description: Used when an action is set to `Set Volume`.
@@ -241,12 +211,10 @@ triggers:
       - unknown
 
 variables:
+  dial_event_entity: !input dial_event
   media_player_entity: !input media_player
   zone_media_players: !input zone_media_players
   current_zone_helper: !input current_zone_helper
-  current_zone_text: !input current_zone_text
-  current_profile_text: !input current_profile_text
-  current_source_text: !input current_source_text
   default_volume: !input default_volume
   volume_step: !input volume_step
   button_single_action: !input button_single_action
@@ -257,6 +225,26 @@ variables:
   event_type: "{{ trigger.to_state.attributes.event_type | default('') }}"
   configured_zone_media_players: >-
     {{ zone_media_players if zone_media_players is sequence and zone_media_players is not string else [] }}
+  m5_device_id: >-
+    {{ device_id(dial_event_entity) | default('', true) if dial_event_entity is string and dial_event_entity != '' else '' }}
+  current_zone_text: >-
+    {% if m5_device_id is string and m5_device_id != '' %}
+      {{ device_entities(m5_device_id) | select('match', '^text\..*_zone_display$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  current_profile_text: >-
+    {% if m5_device_id is string and m5_device_id != '' %}
+      {{ device_entities(m5_device_id) | select('match', '^text\..*_profile_display$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  current_source_text: >-
+    {% if m5_device_id is string and m5_device_id != '' %}
+      {{ device_entities(m5_device_id) | select('match', '^text\..*_source_display$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   current_zone_media: >-
     {% set helper_value = states(current_zone_helper) if current_zone_helper is string and current_zone_helper != '' else '' %}
     {% if helper_value in configured_zone_media_players %}
