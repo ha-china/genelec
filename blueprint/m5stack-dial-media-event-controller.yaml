@@ -283,7 +283,8 @@ variables:
   current_source: >-
     {{ state_attr(current_zone_media, 'source') | default('', true) }}
   current_is_muted: >-
-    {{ state_attr(current_zone_media, 'is_volume_muted') | default(false) }}
+    {% set muted = state_attr(current_zone_media, 'is_volume_muted') %}
+    {{ muted in [true, 'true', 'True', 'on', 'On'] }}
   current_power_state: >-
     {{ states(current_zone_media) | default('', true) }}
   current_mute_badge: >-
@@ -385,6 +386,24 @@ variables:
     {{ state_attr(previous_zone_media, 'source') | default('', true) }}
   next_zone_source: >-
     {{ state_attr(next_zone_media, 'source') | default('', true) }}
+  previous_zone_is_muted: >-
+    {% set muted = state_attr(previous_zone_media, 'is_volume_muted') %}
+    {{ muted in [true, 'true', 'True', 'on', 'On'] }}
+  next_zone_is_muted: >-
+    {% set muted = state_attr(next_zone_media, 'is_volume_muted') %}
+    {{ muted in [true, 'true', 'True', 'on', 'On'] }}
+  previous_zone_power_state: >-
+    {{ states(previous_zone_media) | default('', true) }}
+  next_zone_power_state: >-
+    {{ states(next_zone_media) | default('', true) }}
+  previous_zone_mute_badge: >-
+    {{ 'Mute' if previous_zone_is_muted else '' }}
+  next_zone_mute_badge: >-
+    {{ 'Mute' if next_zone_is_muted else '' }}
+  previous_zone_power_badge: >-
+    {{ 'OFF' if previous_zone_power_state == 'off' else '' }}
+  next_zone_power_badge: >-
+    {{ 'OFF' if next_zone_power_state == 'off' else '' }}
   previous_profile: >-
     {% set options = current_profile_options if current_profile_options is sequence and current_profile_options is not string else [] %}
     {% set current = current_profile %}
@@ -533,6 +552,15 @@ actions:
           - action: media_player.turn_on
             target:
               entity_id: "{{ current_zone_media }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_power_text is string and current_power_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_power_text }}"
+                data:
+                  value: ""
 
       - conditions:
           - condition: template
@@ -541,6 +569,15 @@ actions:
           - action: media_player.turn_off
             target:
               entity_id: "{{ current_zone_media }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_power_text is string and current_power_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_power_text }}"
+                data:
+                  value: "OFF"
 
       - conditions:
           - condition: template
@@ -551,6 +588,15 @@ actions:
               entity_id: "{{ current_zone_media }}"
             data:
               is_volume_muted: true
+          - if:
+              - condition: template
+                value_template: "{{ current_mute_text is string and current_mute_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_mute_text }}"
+                data:
+                  value: "Mute"
 
       - conditions:
           - condition: template
@@ -561,6 +607,15 @@ actions:
               entity_id: "{{ current_zone_media }}"
             data:
               is_volume_muted: false
+          - if:
+              - condition: template
+                value_template: "{{ current_mute_text is string and current_mute_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_mute_text }}"
+                data:
+                  value: ""
 
       - conditions:
           - condition: template
@@ -569,6 +624,15 @@ actions:
           - action: media_player.toggle
             target:
               entity_id: "{{ current_zone_media }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_power_text is string and current_power_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_power_text }}"
+                data:
+                  value: "{{ '' if current_power_state == 'off' else 'OFF' }}"
 
       - conditions:
           - condition: template
@@ -588,6 +652,15 @@ actions:
             data:
               is_volume_muted: >-
                 {{ not (state_attr(current_zone_media, 'is_volume_muted') | default(false)) }}
+          - if:
+              - condition: template
+                value_template: "{{ current_mute_text is string and current_mute_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_mute_text }}"
+                data:
+                  value: "{{ '' if current_is_muted else 'Mute' }}"
 
       - conditions:
           - condition: template
@@ -673,6 +746,24 @@ actions:
                   entity_id: "{{ current_source_text }}"
                 data:
                   value: "{{ previous_zone_source }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_mute_text is string and current_mute_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_mute_text }}"
+                data:
+                  value: "{{ previous_zone_mute_badge }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_power_text is string and current_power_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_power_text }}"
+                data:
+                  value: "{{ previous_zone_power_badge }}"
 
       - conditions:
           - condition: template
@@ -710,6 +801,24 @@ actions:
                   entity_id: "{{ current_source_text }}"
                 data:
                   value: "{{ next_zone_source }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_mute_text is string and current_mute_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_mute_text }}"
+                data:
+                  value: "{{ next_zone_mute_badge }}"
+          - if:
+              - condition: template
+                value_template: "{{ current_power_text is string and current_power_text != '' }}"
+            then:
+              - action: text.set_value
+                target:
+                  entity_id: "{{ current_power_text }}"
+                data:
+                  value: "{{ next_zone_power_badge }}"
 
       - conditions:
           - condition: template
