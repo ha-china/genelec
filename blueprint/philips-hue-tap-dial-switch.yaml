@@ -526,9 +526,9 @@ variables:
   button_num: >-
     {% set pressed = states(last_pressed) %}
     {% if command is string and command | regex_search('button_[1-4]') %}
-      {{ command | regex_replace(find='[^1-4]', replace='') }}
+      {{ (command | regex_replace(find='[^1-4]', replace='')) | string | trim }}
     {% elif command == 'step_with_on_off' and pressed in ['1', '2', '3', '4'] %}
-      {{ pressed }}
+      {{ pressed | string | trim }}
     {% else %}
       {{ '' }}
     {% endif %}
