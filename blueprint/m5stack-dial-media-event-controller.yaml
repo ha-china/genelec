@@ -245,6 +245,18 @@ variables:
     {% else %}
       {{ '' }}
     {% endif %}
+  current_mute_text: >-
+    {% if m5_device_id is string and m5_device_id != '' %}
+      {{ device_entities(m5_device_id) | select('match', '^text\..*_mute_display$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  current_power_text: >-
+    {% if m5_device_id is string and m5_device_id != '' %}
+      {{ device_entities(m5_device_id) | select('match', '^text\..*_power_display$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   current_zone_media: >-
     {% set helper_value = states(current_zone_helper) if current_zone_helper is string and current_zone_helper != '' else '' %}
     {% if helper_value in configured_zone_media_players %}
@@ -270,6 +282,14 @@ variables:
     {{ state_attr(current_zone_media, 'source_list') | default([], true) }}
   current_source: >-
     {{ state_attr(current_zone_media, 'source') | default('', true) }}
+  current_is_muted: >-
+    {{ state_attr(current_zone_media, 'is_volume_muted') | default(false) }}
+  current_power_state: >-
+    {{ states(current_zone_media) | default('', true) }}
+  current_mute_badge: >-
+    {{ 'Mute' if current_is_muted else '' }}
+  current_power_badge: >-
+    {{ 'OFF' if current_power_state == 'off' else '' }}
   current_zone_name: >-
     {% set friendly = state_attr(current_zone_media, 'friendly_name') | default('', true) %}
     {% if friendly.endswith(' Group') %}
@@ -484,6 +504,26 @@ actions:
           entity_id: "{{ current_source_text }}"
         data:
           value: "{{ current_source }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ current_mute_text is string and current_mute_text != '' }}"
+    then:
+      - action: text.set_value
+        target:
+          entity_id: "{{ current_mute_text }}"
+        data:
+          value: "{{ current_mute_badge }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ current_power_text is string and current_power_text != '' }}"
+    then:
+      - action: text.set_value
+        target:
+          entity_id: "{{ current_power_text }}"
+        data:
+          value: "{{ current_power_badge }}"
 
   - choose:
       - conditions:
