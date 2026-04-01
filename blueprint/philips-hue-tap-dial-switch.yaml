@@ -92,6 +92,21 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
+        button_1_default_volume_enabled:
+          name: Enable Default Volume
+          default: false
+          selector:
+            boolean: {}
+        button_1_default_volume:
+          name: Default Volume
+          default: 35
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
         button_1_short_release_action:
           name: Short Release
           default:
@@ -197,6 +212,21 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
+        button_2_default_volume_enabled:
+          name: Enable Default Volume
+          default: false
+          selector:
+            boolean: {}
+        button_2_default_volume:
+          name: Default Volume
+          default: 35
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
         button_2_short_release_action:
           name: Short Release
           default:
@@ -248,6 +278,21 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
+        button_3_default_volume_enabled:
+          name: Enable Default Volume
+          default: false
+          selector:
+            boolean: {}
+        button_3_default_volume:
+          name: Default Volume
+          default: 35
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
         button_3_short_release_action:
           name: Short Release
           default:
@@ -299,6 +344,21 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
+        button_4_default_volume_enabled:
+          name: Enable Default Volume
+          default: false
+          selector:
+            boolean: {}
+        button_4_default_volume:
+          name: Default Volume
+          default: 35
+          selector:
+            number:
+              min: 0
+              max: 100
+              step: 5
+              unit_of_measurement: "%"
+              mode: slider
         button_4_short_release_action:
           name: Short Release
           default:
@@ -366,6 +426,8 @@ variables:
   rotate_right: "{{ command == 'step_with_on_off' and step_mode == 'StepMode.Up' and step_size | int(0) != 255 }}"
 
   button_1_media: !input button_1_media
+  button_1_default_volume_enabled: !input button_1_default_volume_enabled
+  button_1_default_volume: !input button_1_default_volume
   button_1_short_release_action: !input button_1_short_release_action
   button_1_long_press_action: !input button_1_long_press_action
   button_1_double_press_action: !input button_1_double_press_action
@@ -373,6 +435,8 @@ variables:
   button_1_rotate_mode: !input button_1_rotate_mode
 
   button_2_media: !input button_2_media
+  button_2_default_volume_enabled: !input button_2_default_volume_enabled
+  button_2_default_volume: !input button_2_default_volume
   button_2_short_release_action: !input button_2_short_release_action
   button_2_long_press_action: !input button_2_long_press_action
   button_2_double_press_action: !input button_2_double_press_action
@@ -380,6 +444,8 @@ variables:
   button_2_rotate_mode: !input button_2_rotate_mode
 
   button_3_media: !input button_3_media
+  button_3_default_volume_enabled: !input button_3_default_volume_enabled
+  button_3_default_volume: !input button_3_default_volume
   button_3_short_release_action: !input button_3_short_release_action
   button_3_long_press_action: !input button_3_long_press_action
   button_3_double_press_action: !input button_3_double_press_action
@@ -387,6 +453,8 @@ variables:
   button_3_rotate_mode: !input button_3_rotate_mode
 
   button_4_media: !input button_4_media
+  button_4_default_volume_enabled: !input button_4_default_volume_enabled
+  button_4_default_volume: !input button_4_default_volume
   button_4_short_release_action: !input button_4_short_release_action
   button_4_long_press_action: !input button_4_long_press_action
   button_4_double_press_action: !input button_4_double_press_action
@@ -462,6 +530,32 @@ variables:
       {% endfor %}
       {{ ns.result }}
     {% endif %}
+  selected_default_volume: >-
+    {% set key = (command | regex_replace(find='[^1-4]', replace='') if command is string and command | regex_search('button_[1-4]') else states(last_pressed) if command == 'step_with_on_off' and states(last_pressed) in ['1', '2', '3', '4'] else '') | string | trim %}
+    {% if key == '1' %}
+      {{ button_1_default_volume }}
+    {% elif key == '2' %}
+      {{ button_2_default_volume }}
+    {% elif key == '3' %}
+      {{ button_3_default_volume }}
+    {% elif key == '4' %}
+      {{ button_4_default_volume }}
+    {% else %}
+      {{ 35 }}
+    {% endif %}
+  selected_default_volume_enabled: >-
+    {% set key = (command | regex_replace(find='[^1-4]', replace='') if command is string and command | regex_search('button_[1-4]') else states(last_pressed) if command == 'step_with_on_off' and states(last_pressed) in ['1', '2', '3', '4'] else '') | string | trim %}
+    {% if key == '1' %}
+      {{ button_1_default_volume_enabled }}
+    {% elif key == '2' %}
+      {{ button_2_default_volume_enabled }}
+    {% elif key == '3' %}
+      {{ button_3_default_volume_enabled }}
+    {% elif key == '4' %}
+      {{ button_4_default_volume_enabled }}
+    {% else %}
+      {{ false }}
+    {% endif %}
   selected_rotate_mode: >-
     {% set key = (command | regex_replace(find='[^1-4]', replace='') if command is string and command | regex_search('button_[1-4]') else states(last_pressed) if command == 'step_with_on_off' and states(last_pressed) in ['1', '2', '3', '4'] else '') | string | trim %}
     {% if key == '1' %}
@@ -489,7 +583,7 @@ variables:
       []
     {% endif %}
   selected_current_volume: >-
-    {{ state_attr(selected_media, 'volume_level') | default(0.35, true) }}
+    {{ state_attr(selected_media, 'volume_level') | default((selected_default_volume | float(35)) / 100, true) }}
 
 actions:
   - if:
