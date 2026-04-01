@@ -167,27 +167,6 @@ blueprint:
             select:
               options: *media_action_options
               multiple: false
-        button_2_short_release_action:
-          name: Short Release
-          default: toggle_mute
-          selector:
-            select:
-              options: *media_action_options
-              multiple: false
-        button_3_short_release_action:
-          name: Short Release
-          default: toggle_mute
-          selector:
-            select:
-              options: *media_action_options
-              multiple: false
-        button_4_short_release_action:
-          name: Short Release
-          default: toggle_mute
-          selector:
-            select:
-              options: *media_action_options
-              multiple: false
         button_1_double_press_action:
           name: Double Press
           default: none
@@ -248,6 +227,13 @@ blueprint:
               step: 5
               unit_of_measurement: "%"
               mode: slider
+        button_2_short_release_action:
+          name: Short Release
+          default: toggle_mute
+          selector:
+            select:
+              options: *media_action_options
+              multiple: false
         button_2_long_press_action:
           name: Long Press
           default: toggle_power
@@ -305,6 +291,13 @@ blueprint:
               step: 5
               unit_of_measurement: "%"
               mode: slider
+        button_3_short_release_action:
+          name: Short Release
+          default: toggle_mute
+          selector:
+            select:
+              options: *media_action_options
+              multiple: false
         button_3_long_press_action:
           name: Long Press
           default: toggle_power
@@ -362,6 +355,13 @@ blueprint:
               step: 5
               unit_of_measurement: "%"
               mode: slider
+        button_4_short_release_action:
+          name: Short Release
+          default: toggle_mute
+          selector:
+            select:
+              options: *media_action_options
+              multiple: false
         button_4_long_press_action:
           name: Long Press
           default: toggle_power
