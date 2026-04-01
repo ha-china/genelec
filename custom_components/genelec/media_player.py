@@ -138,10 +138,7 @@ def _display_source_from_api_inputs(api_sources: list[str]) -> str:
 
 
 async def _apply_inputs_payload(device: GenelecSmartIPDevice, api_sources: list[str]) -> None:
-    """Apply input selection, clearing lingering analog when needed."""
-    if api_sources and "A" not in api_sources:
-        await device.set_inputs([])
-        await asyncio.sleep(0.15)
+    """Apply input selection with a single request."""
     await device.set_inputs(api_sources)
 
 
@@ -354,8 +351,8 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
 
         return current
 
-    async def _set_inputs_with_verify(self, api_sources: list[str]) -> list[str]:
-        """Set input sources and verify by reading back current inputs."""
+    async def _set_inputs(self, api_sources: list[str]) -> list[str]:
+        """Set input sources without readback verification."""
         await self._ensure_active()
 
         try:
@@ -366,27 +363,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
                 await _apply_inputs_payload(self._device, api_sources)
             else:
                 raise
-
-        await asyncio.sleep(0.3)
-        inputs_data = await self._device.get_inputs()
-        current = _normalize_api_inputs(inputs_data)
-
-        if list(current) != list(api_sources):
-            await _apply_inputs_payload(self._device, api_sources)
-            await asyncio.sleep(0.3)
-            inputs_data = await self._device.get_inputs()
-            current = _normalize_api_inputs(inputs_data)
-
-        if list(current) != list(api_sources):
-            # Last try: wake again then re-apply once.
-            await self._ensure_active()
-            await asyncio.sleep(0.6)
-            await _apply_inputs_payload(self._device, api_sources)
-            await asyncio.sleep(0.3)
-            inputs_data = await self._device.get_inputs()
-            current = _normalize_api_inputs(inputs_data)
-
-        return list(current)
+        return list(api_sources)
 
     async def async_update(self) -> None:
         """Update the media player state."""
@@ -497,10 +474,7 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
             api_source = INPUT_DISPLAY_TO_API.get(source, source)
             api_sources = [api_source]
         
-        applied = await self._set_inputs_with_verify(api_sources)
-        if list(applied) != list(api_sources):
-            # keep UI honest with the device readback value
-            applied = await self._refresh_inputs_from_device()
+        applied = await self._set_inputs(api_sources)
         self._current_sources = list(applied)
         self._current_source = self._sources_to_display(self._current_sources)
         self._push_coordinator_patch({"inputs": {"input": self._current_sources}})
@@ -641,8 +615,8 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
                     break
             self._patch_target(target, {"power": {"state": POWER_STATE_ACTIVE}})
 
-    async def _set_target_inputs_with_verify(self, target: Any, api_sources: list[str]) -> list[str]:
-        """Set inputs and verify by reading /audio/inputs."""
+    async def _set_target_inputs(self, target: Any, api_sources: list[str]) -> list[str]:
+        """Set inputs without readback verification."""
         await self._wake_target_if_needed(target)
 
         try:
@@ -653,25 +627,7 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
                 await _apply_inputs_payload(target.device, api_sources)
             else:
                 raise
-
-        await asyncio.sleep(0.3)
-        current_inputs = await target.device.get_inputs()
-        current = _normalize_api_inputs(current_inputs)
-        if list(current) != list(api_sources):
-            await _apply_inputs_payload(target.device, api_sources)
-            await asyncio.sleep(0.3)
-            current_inputs = await target.device.get_inputs()
-            current = _normalize_api_inputs(current_inputs)
-
-        if list(current) != list(api_sources):
-            await target.device.wake_up()
-            await asyncio.sleep(0.6)
-            await _apply_inputs_payload(target.device, api_sources)
-            await asyncio.sleep(0.3)
-            current_inputs = await target.device.get_inputs()
-            current = _normalize_api_inputs(current_inputs)
-
-        return list(current)
+        return list(api_sources)
 
     def _zone_diagnostics(self, targets: list[Any]) -> dict[str, Any]:
         """Build diagnostics payload for zone controls."""
@@ -842,7 +798,7 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
 
         async def _set_target_source(target: Any) -> list[str] | Exception:
             try:
-                applied_inputs = await self._set_target_inputs_with_verify(target, api_sources)
+                applied_inputs = await self._set_target_inputs(target, api_sources)
             except Exception as err:  # pylint: disable=broad-except
                 return err
             self._patch_target(target, {"inputs": {"input": applied_inputs}})
@@ -864,15 +820,6 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
                 )
                 continue
             applied = result
-
-        if list(applied) != list(api_sources):
-            # Pull once from first target to keep the zone UI aligned.
-            if targets:
-                try:
-                    current_inputs = await targets[0].device.get_inputs()
-                    applied = _normalize_api_inputs(current_inputs)
-                except Exception:
-                    pass
 
         self._current_source = _display_source_from_api_inputs(list(applied))
         self.async_write_ha_state()
