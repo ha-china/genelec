@@ -528,17 +528,39 @@ class GenelecZoneProfileSelect(SelectEntity):
         if profile_id is None:
             return
 
-        for target in self._zone_targets():
-            await target.device.restore_profile(profile_id, startup=False)
-            await asyncio.sleep(0.15)
+        targets = self._zone_targets()
+        if not targets:
+            self._attr_available = False
+            return
+
+        async def _set_target_profile(target: Any) -> Exception | None:
             try:
-                current = await target.device.get_profile_list()
-            except Exception:
-                current = {}
-            selected = current.get("selected") if isinstance(current, dict) else None
-            if selected != profile_id:
                 await target.device.restore_profile(profile_id, startup=False)
-            self._patch_target_profile(target, profile_id)
+                await asyncio.sleep(0.15)
+                try:
+                    current = await target.device.get_profile_list()
+                except Exception:
+                    current = {}
+                selected = current.get("selected") if isinstance(current, dict) else None
+                if selected != profile_id:
+                    await target.device.restore_profile(profile_id, startup=False)
+                self._patch_target_profile(target, profile_id)
+            except Exception as err:  # pylint: disable=broad-except
+                return err
+            return None
+
+        results = await asyncio.gather(
+            *(_set_target_profile(target) for target in targets),
+            return_exceptions=False,
+        )
+        for target, result in zip(targets, results, strict=False):
+            if isinstance(result, Exception):
+                _LOGGER.warning(
+                    "Zone '%s' profile update failed for %s: %s",
+                    self._zone_name,
+                    getattr(target.device, "host", "unknown"),
+                    result,
+                )
 
         self._current_option = option
         self.async_write_ha_state()
