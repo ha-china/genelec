@@ -124,14 +124,6 @@ blueprint:
                   value: mute
                 - label: Unmute
                   value: unmute
-                - label: Toggle (Power)
-                  value: toggle_power
-                - label: Toggle (Mute)
-                  value: toggle_mute
-                - label: Toggle (Ana/AoIP)
-                  value: source_toggle_analog_aoip12
-                - label: Toggle (AoIP1/AoIP2)
-                  value: source_toggle_aoip12
                 - label: Source Analog
                   value: source_analog
                 - label: Source AoIP 01
@@ -146,6 +138,16 @@ blueprint:
                   value: source_aoip_12
                 - label: Source Mix
                   value: source_mix
+                - label: Toggle (Power)
+                  value: toggle_power
+                - label: Toggle (Mute)
+                  value: toggle_mute
+                - label: Toggle (Ana/AoIP)
+                  value: source_toggle_analog_aoip12
+                - label: Toggle (AoIP1/AoIP2)
+                  value: source_toggle_aoip12
+                - label: Toggle (LED)
+                  value: led_toggle
                 - label: Source Previous
                   value: source_previous
                 - label: Source Next
@@ -781,6 +783,17 @@ actions:
                 - action: select.select_next
                   target:
                     entity_id: "{{ selected_profile_select }}"
+
+            - conditions:
+                - condition: template
+                  value_template: "{{ repeat.item == 'led_toggle' and selected_led_intensity is string and selected_led_intensity != '' }}"
+              sequence:
+                - action: number.set_value
+                  target:
+                    entity_id: "{{ selected_led_intensity }}"
+                  data:
+                    value: >-
+                      {{ 0 if states(selected_led_intensity) | float(0) >= 100 else 100 }}
 
             - conditions:
                 - condition: template
