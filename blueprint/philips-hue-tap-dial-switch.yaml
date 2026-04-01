@@ -523,7 +523,15 @@ variables:
   command: "{{ zha_command }}"
   step_mode: "{{ trigger.event.data.params.step_mode | default('0') if trigger.event is defined else '0' }}"
   step_size: "{{ trigger.event.data.params.step_size | default(0) if trigger.event is defined else 0 }}"
-  button_num: "{{ command | regex_replace(find='[^1-4]', replace='') | default(states(last_pressed), true) }}"
+  button_num: >-
+    {% set pressed = states(last_pressed) %}
+    {% if command is string and command | regex_search('button_[1-4]') %}
+      {{ command | regex_replace(find='[^1-4]', replace='') }}
+    {% elif command == 'step_with_on_off' and pressed in ['1', '2', '3', '4'] %}
+      {{ pressed }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   rotate_left: "{{ command == 'step_with_on_off' and step_mode == 'StepMode.Down' and step_size | int(0) != 255 }}"
   rotate_right: "{{ command == 'step_with_on_off' and step_mode == 'StepMode.Up' and step_size | int(0) != 255 }}"
 
