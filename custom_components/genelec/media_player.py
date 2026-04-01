@@ -835,14 +835,38 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         else:
             api_sources = [INPUT_DISPLAY_TO_API.get(source, source)]
 
+        targets = self._zone_targets()
+        if not targets:
+            _LOGGER.warning("Zone '%s' has no members", self._zone_name)
+            return
+
+        async def _set_target_source(target: Any) -> list[str] | Exception:
+            try:
+                applied_inputs = await self._set_target_inputs_with_verify(target, api_sources)
+            except Exception as err:  # pylint: disable=broad-except
+                return err
+            self._patch_target(target, {"inputs": {"input": applied_inputs}})
+            return applied_inputs
+
+        results = await asyncio.gather(
+            *(_set_target_source(target) for target in targets),
+            return_exceptions=False,
+        )
+
         applied = api_sources
-        for target in self._zone_targets():
-            applied = await self._set_target_inputs_with_verify(target, api_sources)
-            self._patch_target(target, {"inputs": {"input": applied}})
+        for target, result in zip(targets, results, strict=False):
+            if isinstance(result, Exception):
+                _LOGGER.warning(
+                    "Zone '%s' source update failed for %s: %s",
+                    self._zone_name,
+                    getattr(target.device, "host", "unknown"),
+                    result,
+                )
+                continue
+            applied = result
 
         if list(applied) != list(api_sources):
             # Pull once from first target to keep the zone UI aligned.
-            targets = self._zone_targets()
             if targets:
                 try:
                     current_inputs = await targets[0].device.get_inputs()
@@ -915,8 +939,24 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_turn_on(self) -> None:
-        for target in self._zone_targets():
-            await target.device.wake_up()
+        targets = self._zone_targets()
+        if not targets:
+            _LOGGER.warning("Zone '%s' has no members", self._zone_name)
+            return
+
+        results = await asyncio.gather(
+            *(target.device.wake_up() for target in targets),
+            return_exceptions=True,
+        )
+        for target, result in zip(targets, results, strict=False):
+            if isinstance(result, Exception):
+                _LOGGER.warning(
+                    "Zone '%s' wake update failed for %s: %s",
+                    self._zone_name,
+                    getattr(target.device, "host", "unknown"),
+                    result,
+                )
+                continue
             self._patch_target(target, {"power": {"state": POWER_STATE_ACTIVE}})
 
         self._power_state = POWER_STATE_ACTIVE
@@ -924,8 +964,24 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
-        for target in self._zone_targets():
-            await target.device.set_standby()
+        targets = self._zone_targets()
+        if not targets:
+            _LOGGER.warning("Zone '%s' has no members", self._zone_name)
+            return
+
+        results = await asyncio.gather(
+            *(target.device.set_standby() for target in targets),
+            return_exceptions=True,
+        )
+        for target, result in zip(targets, results, strict=False):
+            if isinstance(result, Exception):
+                _LOGGER.warning(
+                    "Zone '%s' standby update failed for %s: %s",
+                    self._zone_name,
+                    getattr(target.device, "host", "unknown"),
+                    result,
+                )
+                continue
             self._patch_target(target, {"power": {"state": POWER_STATE_STANDBY}})
 
         self._power_state = POWER_STATE_STANDBY
