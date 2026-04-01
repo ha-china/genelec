@@ -584,8 +584,18 @@ variables:
   button_4_rotate_mode: !input button_4_rotate_mode
 
   selected_media: >-
-    {% set mapping = {'1': button_1_media, '2': button_2_media, '3': button_3_media, '4': button_4_media} %}
-    {{ mapping.get(button_num, '') }}
+    {% set key = button_num | string | trim %}
+    {% if key == '1' %}
+      {{ button_1_media }}
+    {% elif key == '2' %}
+      {{ button_2_media }}
+    {% elif key == '3' %}
+      {{ button_3_media }}
+    {% elif key == '4' %}
+      {{ button_4_media }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   selected_media_device: >-
     {% if selected_media is string and selected_media != '' %}
       {{ device_id(selected_media) | default('', true) }}
@@ -593,14 +603,44 @@ variables:
       {{ '' }}
     {% endif %}
   selected_legacy_source_media: >-
-    {% set mapping = {'1': button_1_source_media, '2': button_2_source_media, '3': button_3_source_media, '4': button_4_source_media} %}
-    {{ mapping.get(button_num, '') }}
+    {% set key = button_num | string | trim %}
+    {% if key == '1' %}
+      {{ button_1_source_media }}
+    {% elif key == '2' %}
+      {{ button_2_source_media }}
+    {% elif key == '3' %}
+      {{ button_3_source_media }}
+    {% elif key == '4' %}
+      {{ button_4_source_media }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   selected_legacy_profile_device: >-
-    {% set mapping = {'1': button_1_profile_device, '2': button_2_profile_device, '3': button_3_profile_device, '4': button_4_profile_device} %}
-    {{ mapping.get(button_num, '') }}
+    {% set key = button_num | string | trim %}
+    {% if key == '1' %}
+      {{ button_1_profile_device }}
+    {% elif key == '2' %}
+      {{ button_2_profile_device }}
+    {% elif key == '3' %}
+      {{ button_3_profile_device }}
+    {% elif key == '4' %}
+      {{ button_4_profile_device }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   selected_legacy_led_device: >-
-    {% set mapping = {'1': button_1_led_device, '2': button_2_led_device, '3': button_3_led_device, '4': button_4_led_device} %}
-    {{ mapping.get(button_num, '') }}
+    {% set key = button_num | string | trim %}
+    {% if key == '1' %}
+      {{ button_1_led_device }}
+    {% elif key == '2' %}
+      {{ button_2_led_device }}
+    {% elif key == '3' %}
+      {{ button_3_led_device }}
+    {% elif key == '4' %}
+      {{ button_4_led_device }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   selected_source_media: >-
     {% if selected_legacy_source_media is string and selected_legacy_source_media != '' %}
       {{ selected_legacy_source_media }}
@@ -660,27 +700,54 @@ variables:
       {{ ns.result }}
     {% endif %}
   selected_default_volume: >-
-    {% set mapping = {'1': button_1_default_volume, '2': button_2_default_volume, '3': button_3_default_volume, '4': button_4_default_volume} %}
-    {{ mapping.get(button_num, 35) }}
+    {% set key = button_num | string | trim %}
+    {% if key == '1' %}
+      {{ button_1_default_volume }}
+    {% elif key == '2' %}
+      {{ button_2_default_volume }}
+    {% elif key == '3' %}
+      {{ button_3_default_volume }}
+    {% elif key == '4' %}
+      {{ button_4_default_volume }}
+    {% else %}
+      {{ 35 }}
+    {% endif %}
   selected_default_volume_enabled: >-
-    {% set mapping = {'1': button_1_default_volume_enabled, '2': button_2_default_volume_enabled, '3': button_3_default_volume_enabled, '4': button_4_default_volume_enabled} %}
-    {{ mapping.get(button_num, false) }}
+    {% set key = button_num | string | trim %}
+    {% if key == '1' %}
+      {{ button_1_default_volume_enabled }}
+    {% elif key == '2' %}
+      {{ button_2_default_volume_enabled }}
+    {% elif key == '3' %}
+      {{ button_3_default_volume_enabled }}
+    {% elif key == '4' %}
+      {{ button_4_default_volume_enabled }}
+    {% else %}
+      {{ false }}
+    {% endif %}
   selected_rotate_mode: >-
-    {% set mapping = {'1': button_1_rotate_mode, '2': button_2_rotate_mode, '3': button_3_rotate_mode, '4': button_4_rotate_mode} %}
-    {{ mapping.get(button_num, 'none') }}
+    {% set key = button_num | string | trim %}
+    {% if key == '1' %}
+      {{ button_1_rotate_mode }}
+    {% elif key == '2' %}
+      {{ button_2_rotate_mode }}
+    {% elif key == '3' %}
+      {{ button_3_rotate_mode }}
+    {% elif key == '4' %}
+      {{ button_4_rotate_mode }}
+    {% else %}
+      {{ 'none' }}
+    {% endif %}
   selected_action: >-
-    {% set short_map = {'1': button_1_short_release_action, '2': button_2_short_release_action, '3': button_3_short_release_action, '4': button_4_short_release_action} %}
-    {% set long_map = {'1': button_1_long_press_action, '2': button_2_long_press_action, '3': button_3_long_press_action, '4': button_4_long_press_action} %}
-    {% set double_map = {'1': button_1_double_press_action, '2': button_2_double_press_action, '3': button_3_double_press_action, '4': button_4_double_press_action} %}
-    {% set triple_map = {'1': button_1_triple_press_action, '2': button_2_triple_press_action, '3': button_3_triple_press_action, '4': button_4_triple_press_action} %}
+    {% set key = button_num | string | trim %}
     {% if command == 'button_' ~ button_num ~ '_short_release' %}
-      {{ short_map.get(button_num, 'none') }}
+      {% if key == '1' %}{{ button_1_short_release_action }}{% elif key == '2' %}{{ button_2_short_release_action }}{% elif key == '3' %}{{ button_3_short_release_action }}{% elif key == '4' %}{{ button_4_short_release_action }}{% else %}none{% endif %}
     {% elif command == 'button_' ~ button_num ~ '_hold' %}
-      {{ long_map.get(button_num, 'none') }}
+      {% if key == '1' %}{{ button_1_long_press_action }}{% elif key == '2' %}{{ button_2_long_press_action }}{% elif key == '3' %}{{ button_3_long_press_action }}{% elif key == '4' %}{{ button_4_long_press_action }}{% else %}none{% endif %}
     {% elif command == 'button_' ~ button_num ~ '_double_press' %}
-      {{ double_map.get(button_num, 'none') }}
+      {% if key == '1' %}{{ button_1_double_press_action }}{% elif key == '2' %}{{ button_2_double_press_action }}{% elif key == '3' %}{{ button_3_double_press_action }}{% elif key == '4' %}{{ button_4_double_press_action }}{% else %}none{% endif %}
     {% elif command == 'button_' ~ button_num ~ '_triple_press' %}
-      {{ triple_map.get(button_num, 'none') }}
+      {% if key == '1' %}{{ button_1_triple_press_action }}{% elif key == '2' %}{{ button_2_triple_press_action }}{% elif key == '3' %}{{ button_3_triple_press_action }}{% elif key == '4' %}{{ button_4_triple_press_action }}{% else %}none{% endif %}
     {% else %}
       none
     {% endif %}
