@@ -92,6 +92,35 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
+        button_1_source_media:
+          name: Source Media Player
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player.
+          selector:
+            entity:
+              filter:
+                - integration: genelec
+                  domain:
+                    - media_player
+              multiple: false
+        button_1_profile_device:
+          name: Profile Device
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player device.
+          selector:
+            device:
+              filter:
+                - integration: genelec
+              multiple: false
+        button_1_led_device:
+          name: LED Device
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player device.
+          selector:
+            device:
+              filter:
+                - integration: genelec
+              multiple: false
         button_1_default_volume_enabled:
           name: Enable Default Volume
           default: false
@@ -129,6 +158,8 @@ blueprint:
                   value: toggle_mute
                 - label: Toggle (Input)
                   value: source_toggle_analog_aoip12
+                - label: Toggle (AOIP)
+                  value: source_toggle_aoip12
                 - label: Set Volume
                   value: set_volume
                 - label: Source Analog
@@ -210,6 +241,35 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
+        button_2_source_media:
+          name: Source Media Player
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player.
+          selector:
+            entity:
+              filter:
+                - integration: genelec
+                  domain:
+                    - media_player
+              multiple: false
+        button_2_profile_device:
+          name: Profile Device
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player device.
+          selector:
+            device:
+              filter:
+                - integration: genelec
+              multiple: false
+        button_2_led_device:
+          name: LED Device
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player device.
+          selector:
+            device:
+              filter:
+                - integration: genelec
+              multiple: false
         button_2_default_volume_enabled:
           name: Enable Default Volume
           default: false
@@ -274,6 +334,35 @@ blueprint:
                 - domain:
                     - media_player
               multiple: false
+        button_3_source_media:
+          name: Source Media Player
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player.
+          selector:
+            entity:
+              filter:
+                - integration: genelec
+                  domain:
+                    - media_player
+              multiple: false
+        button_3_profile_device:
+          name: Profile Device
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player device.
+          selector:
+            device:
+              filter:
+                - integration: genelec
+              multiple: false
+        button_3_led_device:
+          name: LED Device
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player device.
+          selector:
+            device:
+              filter:
+                - integration: genelec
+              multiple: false
         button_3_default_volume_enabled:
           name: Enable Default Volume
           default: false
@@ -337,6 +426,35 @@ blueprint:
               filter:
                 - domain:
                     - media_player
+              multiple: false
+        button_4_source_media:
+          name: Source Media Player
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player.
+          selector:
+            entity:
+              filter:
+                - integration: genelec
+                  domain:
+                    - media_player
+              multiple: false
+        button_4_profile_device:
+          name: Profile Device
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player device.
+          selector:
+            device:
+              filter:
+                - integration: genelec
+              multiple: false
+        button_4_led_device:
+          name: LED Device
+          default: []
+          description: Legacy compatibility input. Leave empty to use Media Player device.
+          selector:
+            device:
+              filter:
+                - integration: genelec
               multiple: false
         button_4_default_volume_enabled:
           name: Enable Default Volume
@@ -410,6 +528,9 @@ variables:
   rotate_right: "{{ command == 'step_with_on_off' and step_mode == 'StepMode.Up' and step_size | int(0) != 255 }}"
 
   button_1_media: !input button_1_media
+  button_1_source_media: !input button_1_source_media
+  button_1_profile_device: !input button_1_profile_device
+  button_1_led_device: !input button_1_led_device
   button_1_default_volume_enabled: !input button_1_default_volume_enabled
   button_1_default_volume: !input button_1_default_volume
   button_1_short_release_action: !input button_1_short_release_action
@@ -419,6 +540,9 @@ variables:
   button_1_rotate_mode: !input button_1_rotate_mode
 
   button_2_media: !input button_2_media
+  button_2_source_media: !input button_2_source_media
+  button_2_profile_device: !input button_2_profile_device
+  button_2_led_device: !input button_2_led_device
   button_2_default_volume_enabled: !input button_2_default_volume_enabled
   button_2_default_volume: !input button_2_default_volume
   button_2_short_release_action: !input button_2_short_release_action
@@ -428,6 +552,9 @@ variables:
   button_2_rotate_mode: !input button_2_rotate_mode
 
   button_3_media: !input button_3_media
+  button_3_source_media: !input button_3_source_media
+  button_3_profile_device: !input button_3_profile_device
+  button_3_led_device: !input button_3_led_device
   button_3_default_volume_enabled: !input button_3_default_volume_enabled
   button_3_default_volume: !input button_3_default_volume
   button_3_short_release_action: !input button_3_short_release_action
@@ -437,6 +564,9 @@ variables:
   button_3_rotate_mode: !input button_3_rotate_mode
 
   button_4_media: !input button_4_media
+  button_4_source_media: !input button_4_source_media
+  button_4_profile_device: !input button_4_profile_device
+  button_4_led_device: !input button_4_led_device
   button_4_default_volume_enabled: !input button_4_default_volume_enabled
   button_4_default_volume: !input button_4_default_volume
   button_4_short_release_action: !input button_4_short_release_action
@@ -454,16 +584,33 @@ variables:
     {% else %}
       {{ '' }}
     {% endif %}
+  selected_legacy_source_media: >-
+    {% set mapping = {'1': button_1_source_media, '2': button_2_source_media, '3': button_3_source_media, '4': button_4_source_media} %}
+    {{ mapping.get(button_num, '') }}
+  selected_legacy_profile_device: >-
+    {% set mapping = {'1': button_1_profile_device, '2': button_2_profile_device, '3': button_3_profile_device, '4': button_4_profile_device} %}
+    {{ mapping.get(button_num, '') }}
+  selected_legacy_led_device: >-
+    {% set mapping = {'1': button_1_led_device, '2': button_2_led_device, '3': button_3_led_device, '4': button_4_led_device} %}
+    {{ mapping.get(button_num, '') }}
   selected_source_media: >-
-    {{ selected_media }}
+    {% if selected_legacy_source_media is string and selected_legacy_source_media != '' %}
+      {{ selected_legacy_source_media }}
+    {% else %}
+      {{ selected_media }}
+    {% endif %}
   selected_profile_select: >-
-    {% if selected_media_device is string and selected_media_device != '' %}
+    {% if selected_legacy_profile_device is string and selected_legacy_profile_device != '' %}
+      {{ device_entities(selected_legacy_profile_device) | select('match', '^select\\..*_profile$') | list | first | default('') }}
+    {% elif selected_media_device is string and selected_media_device != '' %}
       {{ device_entities(selected_media_device) | select('match', '^select\\..*_profile$') | list | first | default('') }}
     {% else %}
       {{ '' }}
     {% endif %}
   selected_led_intensity: >-
-    {% if selected_media_device is string and selected_media_device != '' %}
+    {% if selected_legacy_led_device is string and selected_legacy_led_device != '' %}
+      {{ device_entities(selected_legacy_led_device) | select('match', '^number\\..*_led_intensity$') | list | first | default('') }}
+    {% elif selected_media_device is string and selected_media_device != '' %}
       {{ device_entities(selected_media_device) | select('match', '^number\\..*_led_intensity$') | list | first | default('') }}
     {% else %}
       {{ '' }}
@@ -688,6 +835,17 @@ actions:
             data:
               source: >-
                 {{ 'AoIP 01 + AoIP 02' if selected_source_current == 'Analog' else 'Analog' }}
+
+      - conditions:
+          - condition: template
+            value_template: "{{ selected_action == 'source_toggle_aoip12' and selected_source_media is string and selected_source_media != '' }}"
+        sequence:
+          - action: media_player.select_source
+            target:
+              entity_id: "{{ selected_source_media }}"
+            data:
+              source: >-
+                {{ 'AoIP 02' if selected_source_current == 'AoIP 01' else 'AoIP 01' }}
 
       - conditions:
           - condition: template
