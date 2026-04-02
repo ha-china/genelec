@@ -197,7 +197,8 @@ blueprint:
               value: next_track
           multiple: false
 
-mode: restart
+mode: queued
+max: 50
 
 triggers:
   - trigger: state
@@ -225,7 +226,7 @@ triggers:
       - unavailable
       - unknown
   - trigger: time_pattern
-    seconds: "/1"
+    seconds: "/2"
 
 variables:
   dial_event_entity: !input dial_event
