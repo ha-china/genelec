@@ -209,24 +209,8 @@ triggers:
     not_to:
       - unavailable
       - unknown
-  - trigger: state
-    entity_id: !input current_zone_helper
-    not_from:
-      - unavailable
-      - unknown
-    not_to:
-      - unavailable
-      - unknown
-  - trigger: state
-    entity_id: !input zone_media_players
-    not_from:
-      - unavailable
-      - unknown
-    not_to:
-      - unavailable
-      - unknown
   - trigger: time_pattern
-    seconds: "/2"
+    seconds: "/1"
 
 variables:
   dial_event_entity: !input dial_event
