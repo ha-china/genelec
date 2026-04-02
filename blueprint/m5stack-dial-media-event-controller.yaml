@@ -197,8 +197,7 @@ blueprint:
               value: next_track
           multiple: false
 
-mode: queued
-max: 50
+mode: restart
 
 triggers:
   - trigger: state
@@ -226,7 +225,7 @@ triggers:
       - unavailable
       - unknown
   - trigger: time_pattern
-    seconds: "/2"
+    seconds: "/1"
 
 variables:
   dial_event_entity: !input dial_event
@@ -286,6 +285,12 @@ variables:
   current_volume_text: >-
     {% if m5_device_id is string and m5_device_id != '' %}
       {{ device_entities(m5_device_id) | select('match', '^text\..*_volume_display$') | list | first | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
+  current_volume_step_number: >-
+    {% if m5_device_id is string and m5_device_id != '' %}
+      {{ device_entities(m5_device_id) | select('match', '^number\..*_volume_step$') | list | first | default('') }}
     {% else %}
       {{ '' }}
     {% endif %}
@@ -542,7 +547,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ current_zone_text is string and current_zone_text != '' }}"
+        value_template: "{{ event_type == '' and current_zone_text is string and current_zone_text != '' }}"
     then:
       - action: text.set_value
         target:
@@ -552,7 +557,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ current_profile_text is string and current_profile_text != '' }}"
+        value_template: "{{ event_type == '' and current_profile_text is string and current_profile_text != '' }}"
     then:
       - action: text.set_value
         target:
@@ -562,7 +567,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ current_source_text is string and current_source_text != '' }}"
+        value_template: "{{ event_type == '' and current_source_text is string and current_source_text != '' }}"
     then:
       - action: text.set_value
         target:
@@ -572,7 +577,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ current_volume_text is string and current_volume_text != '' }}"
+        value_template: "{{ event_type == '' and current_volume_text is string and current_volume_text != '' }}"
     then:
       - action: text.set_value
         target:
@@ -582,7 +587,17 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ current_mute_text is string and current_mute_text != '' }}"
+        value_template: "{{ event_type == '' and current_volume_step_number is string and current_volume_step_number != '' }}"
+    then:
+      - action: number.set_value
+        target:
+          entity_id: "{{ current_volume_step_number }}"
+        data:
+          value: "{{ volume_step_db | float(1.0) }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ event_type == '' and current_mute_text is string and current_mute_text != '' }}"
     then:
       - action: text.set_value
         target:
@@ -592,7 +607,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ current_power_text is string and current_power_text != '' }}"
+        value_template: "{{ event_type == '' and current_power_text is string and current_power_text != '' }}"
     then:
       - action: text.set_value
         target:
@@ -761,15 +776,6 @@ actions:
               entity_id: "{{ current_zone_media }}"
             data:
               volume_level: "{{ (default_volume | float(35)) / 100 }}"
-          - if:
-              - condition: template
-                value_template: "{{ current_volume_text is string and current_volume_text != '' }}"
-            then:
-              - action: text.set_value
-                target:
-                  entity_id: "{{ current_volume_text }}"
-                data:
-                  value: "{{ '%.1f dB' | format((-130.0 + (default_volume | float(35) / 100.0) * 130.0) | round(1)) }}"
 
       - conditions:
           - condition: template
@@ -781,16 +787,6 @@ actions:
             data:
               volume_level: >-
                 {{ [1.0, (state_attr(current_zone_media, 'volume_level') | float(0)) + volume_step_level] | min }}
-          - if:
-              - condition: template
-                value_template: "{{ current_volume_text is string and current_volume_text != '' }}"
-            then:
-              - action: text.set_value
-                target:
-                  entity_id: "{{ current_volume_text }}"
-                data:
-                  value: >-
-                    {{ '%.1f dB' | format((-130.0 + ([1.0, (state_attr(current_zone_media, 'volume_level') | float(0)) + volume_step_level] | min) * 130.0) | round(1)) }}
 
       - conditions:
           - condition: template
@@ -802,16 +798,6 @@ actions:
             data:
               volume_level: >-
                 {{ [0.0, (state_attr(current_zone_media, 'volume_level') | float(0)) - volume_step_level] | max }}
-          - if:
-              - condition: template
-                value_template: "{{ current_volume_text is string and current_volume_text != '' }}"
-            then:
-              - action: text.set_value
-                target:
-                  entity_id: "{{ current_volume_text }}"
-                data:
-                  value: >-
-                    {{ '%.1f dB' | format((-130.0 + ([0.0, (state_attr(current_zone_media, 'volume_level') | float(0)) - volume_step_level] | max) * 130.0) | round(1)) }}
 
       - conditions:
           - condition: template
