@@ -209,6 +209,24 @@ triggers:
     not_to:
       - unavailable
       - unknown
+  - trigger: state
+    entity_id: !input current_zone_helper
+    not_from:
+      - unavailable
+      - unknown
+    not_to:
+      - unavailable
+      - unknown
+  - trigger: state
+    entity_id: !input zone_media_players
+    not_from:
+      - unavailable
+      - unknown
+    not_to:
+      - unavailable
+      - unknown
+  - trigger: time_pattern
+    seconds: "/2"
 
 variables:
   dial_event_entity: !input dial_event
@@ -224,7 +242,13 @@ variables:
   button_long_action: !input button_long_action
   rotate_left_action: !input rotate_left_action
   rotate_right_action: !input rotate_right_action
-  event_type: "{{ trigger.to_state.attributes.event_type | default('') }}"
+  trigger_platform: "{{ trigger.platform | default('') }}"
+  event_type: >-
+    {% if trigger.platform == 'state' and trigger.to_state is not none %}
+      {{ trigger.to_state.attributes.event_type | default('') }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   configured_zone_media_players: >-
     {{ zone_media_players if zone_media_players is sequence and zone_media_players is not string else [] }}
   m5_device_id: >-
