@@ -197,7 +197,7 @@ blueprint:
               value: next_track
           multiple: false
 
-mode: queued
+mode: parallel
 max: 50
 
 triggers:
