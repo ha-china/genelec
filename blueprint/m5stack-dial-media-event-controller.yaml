@@ -198,8 +198,7 @@ blueprint:
               value: next_track
           multiple: false
 
-mode: parallel
-max: 50
+mode: restart
 
 triggers:
   - trigger: state
@@ -210,8 +209,24 @@ triggers:
     not_to:
       - unavailable
       - unknown
+  - trigger: state
+    entity_id: !input media_player
+    not_from:
+      - unavailable
+      - unknown
+    not_to:
+      - unavailable
+      - unknown
+  - trigger: state
+    entity_id: !input zone_media_players
+    not_from:
+      - unavailable
+      - unknown
+    not_to:
+      - unavailable
+      - unknown
   - trigger: time_pattern
-    seconds: "/1"
+    seconds: "/5"
 
 variables:
   dial_event_entity: !input dial_event
@@ -543,7 +558,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ event_type == '' and current_zone_text is string and current_zone_text != '' }}"
+        value_template: "{{ event_type == '' and current_zone_text is string and current_zone_text != '' and states(current_zone_text) != current_zone_name }}"
     then:
       - action: text.set_value
         target:
@@ -553,7 +568,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ event_type == '' and current_profile_text is string and current_profile_text != '' }}"
+        value_template: "{{ event_type == '' and current_profile_text is string and current_profile_text != '' and states(current_profile_text) != current_profile }}"
     then:
       - action: text.set_value
         target:
@@ -563,7 +578,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ event_type == '' and current_source_text is string and current_source_text != '' }}"
+        value_template: "{{ event_type == '' and current_source_text is string and current_source_text != '' and states(current_source_text) != current_source }}"
     then:
       - action: text.set_value
         target:
@@ -573,7 +588,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ event_type == '' and current_volume_text is string and current_volume_text != '' }}"
+        value_template: "{{ event_type == '' and current_volume_text is string and current_volume_text != '' and states(current_volume_text) != current_volume_display }}"
     then:
       - action: text.set_value
         target:
@@ -583,7 +598,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ event_type == '' and current_volume_step_number is string and current_volume_step_number != '' }}"
+        value_template: "{{ event_type == '' and current_volume_step_number is string and current_volume_step_number != '' and (states(current_volume_step_number) | float(1.0)) != (volume_step_db | float(1.0)) }}"
     then:
       - action: number.set_value
         target:
@@ -593,7 +608,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ event_type == '' and current_mute_text is string and current_mute_text != '' }}"
+        value_template: "{{ event_type == '' and current_mute_text is string and current_mute_text != '' and states(current_mute_text) != current_mute_badge }}"
     then:
       - action: text.set_value
         target:
@@ -603,7 +618,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ event_type == '' and current_power_text is string and current_power_text != '' }}"
+        value_template: "{{ event_type == '' and current_power_text is string and current_power_text != '' and states(current_power_text) != current_power_badge }}"
     then:
       - action: text.set_value
         target:
