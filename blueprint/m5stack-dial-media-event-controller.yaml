@@ -7,7 +7,6 @@ blueprint:
     - `button_single`
     - `button_double`
     - `button_long`
-    - `volume_apply`
     - `rotate_left`
     - `rotate_right`
     - `zone_prev`
@@ -327,16 +326,6 @@ variables:
     {{ (-130.0 + (current_volume_level | float(0)) * 130.0) | round(1) }}
   current_volume_display: >-
     {{ '%.1f dB' | format(current_volume_db | float(-20.0)) }}
-  displayed_volume_db: >-
-    {% if current_volume_text is string and current_volume_text != '' %}
-      {% set raw = states(current_volume_text) | default('', true) %}
-      {% set trimmed = raw[:-3] if raw.endswith(' dB') else raw %}
-      {{ trimmed | float(current_volume_db | float(-20.0)) }}
-    {% else %}
-      {{ current_volume_db | float(-20.0) }}
-    {% endif %}
-  displayed_volume_level: >-
-    {{ [1.0, [0.0, ((displayed_volume_db | float(-20.0)) + 130.0) / 130.0] | max] | min }}
   current_is_muted: >-
     {% set muted = state_attr(current_zone_media, 'is_volume_muted') %}
     {{ muted in [true, 'true', 'True', 'on', 'On'] }}
@@ -628,16 +617,6 @@ actions:
           value: "{{ current_power_badge }}"
 
   - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ event_type == 'volume_apply' and current_volume_text is string and current_volume_text != '' }}"
-        sequence:
-          - action: media_player.volume_set
-            target:
-              entity_id: "{{ current_zone_media }}"
-            data:
-              volume_level: "{{ displayed_volume_level }}"
-
       - conditions:
           - condition: template
             value_template: "{{ selected_action == 'turn_on' }}"
