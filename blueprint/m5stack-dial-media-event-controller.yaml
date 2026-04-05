@@ -347,10 +347,13 @@ variables:
     {{ 'OFF' if current_power_state == 'off' else '' }}
   current_zone_name: >-
     {% set friendly = state_attr(current_zone_media, 'friendly_name') | default('', true) %}
-    {% if friendly.endswith(' Group') %}
-      {{ friendly[:-6] }}
-    {% elif friendly != '' %}
-      {{ friendly }}
+    {% set normalized = friendly[:-6] if friendly.endswith(' Group') else friendly %}
+    {% set tokens = normalized.split(' ') %}
+    {% set half = (tokens | count) // 2 %}
+    {% if tokens | count > 1 and (tokens | count) % 2 == 0 and tokens[:half] == tokens[half:] %}
+      {{ tokens[:half] | join(' ') }}
+    {% elif normalized != '' %}
+      {{ normalized }}
     {% else %}
       {{ current_zone_media }}
     {% endif %}
@@ -392,19 +395,25 @@ variables:
     {% endif %}
   previous_zone_name: >-
     {% set friendly = state_attr(previous_zone_media, 'friendly_name') | default('', true) %}
-    {% if friendly.endswith(' Group') %}
-      {{ friendly[:-6] }}
-    {% elif friendly != '' %}
-      {{ friendly }}
+    {% set normalized = friendly[:-6] if friendly.endswith(' Group') else friendly %}
+    {% set tokens = normalized.split(' ') %}
+    {% set half = (tokens | count) // 2 %}
+    {% if tokens | count > 1 and (tokens | count) % 2 == 0 and tokens[:half] == tokens[half:] %}
+      {{ tokens[:half] | join(' ') }}
+    {% elif normalized != '' %}
+      {{ normalized }}
     {% else %}
       {{ previous_zone_media }}
     {% endif %}
   next_zone_name: >-
     {% set friendly = state_attr(next_zone_media, 'friendly_name') | default('', true) %}
-    {% if friendly.endswith(' Group') %}
-      {{ friendly[:-6] }}
-    {% elif friendly != '' %}
-      {{ friendly }}
+    {% set normalized = friendly[:-6] if friendly.endswith(' Group') else friendly %}
+    {% set tokens = normalized.split(' ') %}
+    {% set half = (tokens | count) // 2 %}
+    {% if tokens | count > 1 and (tokens | count) % 2 == 0 and tokens[:half] == tokens[half:] %}
+      {{ tokens[:half] | join(' ') }}
+    {% elif normalized != '' %}
+      {{ normalized }}
     {% else %}
       {{ next_zone_media }}
     {% endif %}
