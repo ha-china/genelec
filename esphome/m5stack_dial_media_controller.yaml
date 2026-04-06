@@ -1,0 +1,769 @@
+substitutions:
+  name: m5stack-dial-media
+  friendly_name: M5Stack Dial
+  ui_timeout_ms: "10000"
+  swipe_threshold_px: "60"
+  rotate_debounce_ms: "25"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: 600
+    then:
+      - output.turn_on: power_hold
+      - bm8563.read_time:
+          id: rtc_time
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+
+api:
+
+esp32_improv:
+  authorizer: none
+
+improv_serial:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Fallback"
+    password: !secret fallback_hotspot_password
+
+captive_portal:
+
+spi:
+  clk_pin: GPIO6
+  mosi_pin: GPIO5
+
+i2c:
+  sda: GPIO11
+  scl: GPIO12
+  scan: true
+  id: internal_i2c
+
+time:
+  - platform: bm8563
+    id: rtc_time
+    update_interval: never
+
+  - platform: homeassistant
+    id: ha_time
+    on_time_sync:
+      then:
+        - bm8563.write_time:
+            id: rtc_time
+
+globals:
+  - id: volume_cache
+    type: float
+    restore_value: yes
+    initial_value: "-20.0"
+  - id: ui_last_interaction_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+  - id: buzzer_frequency
+    type: float
+    restore_value: yes
+    initial_value: "2000.0"
+  - id: screen_page
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: config_row
+    type: int
+    restore_value: no
+    initial_value: "0"
+  - id: swipe_handled
+    type: bool
+    restore_value: no
+    initial_value: "false"
+  - id: last_rotate_event_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+  - id: volume_sync_hold_until_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: "0"
+  - id: zone_display_value
+    type: std::string
+    restore_value: yes
+    initial_value: '"-"'
+  - id: profile_display_value
+    type: std::string
+    restore_value: yes
+    initial_value: '"-"'
+  - id: source_display_value
+    type: std::string
+    restore_value: yes
+    initial_value: '"-"'
+  - id: mute_display_value
+    type: std::string
+    restore_value: yes
+    initial_value: '""'
+  - id: power_display_value
+    type: std::string
+    restore_value: yes
+    initial_value: '""'
+  - id: volume_display_value
+    type: std::string
+    restore_value: yes
+    initial_value: '"-20.0 dB"'
+  - id: volume_step_value
+    type: float
+    restore_value: yes
+    initial_value: "1.0"
+
+output:
+  - platform: gpio
+    pin: GPIO46
+    id: power_hold
+  - platform: ledc
+    pin: GPIO9
+    id: backlight_pwm
+  - platform: ledc
+    pin: GPIO3
+    id: buzzer_output
+    frequency: 2000Hz
+
+rtttl:
+  output: buzzer_output
+
+light:
+  - platform: monochromatic
+    output: backlight_pwm
+    id: backlight
+    name: "${friendly_name} Backlight"
+    restore_mode: ALWAYS_ON
+    default_transition_length: 0s
+
+  - platform: monochromatic
+    output: buzzer_output
+    id: buzzer_light
+    name: "${friendly_name} Buzzer"
+    icon: mdi:speaker-wireless
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+
+number:
+  - platform: template
+    id: buzzer_tone
+    name: "${friendly_name} Buzzer Tone"
+    optimistic: true
+    restore_value: true
+    min_value: 200
+    max_value: 5000
+    step: 50
+    initial_value: 2000
+    unit_of_measurement: "Hz"
+    mode: slider
+    set_action:
+      - lambda: |-
+          id(buzzer_frequency) = x;
+          id(buzzer_output).update_frequency(x);
+
+  - platform: template
+    id: volume_step_number
+    name: "${friendly_name} Volume Step"
+    optimistic: true
+    restore_value: true
+    min_value: 0.5
+    max_value: 6.0
+    step: 0.5
+    initial_value: 1.0
+    unit_of_measurement: "dB"
+    mode: slider
+    set_action:
+      - lambda: |-
+          id(volume_step_value) = x;
+
+font:
+  - file: "gfonts://Roboto"
+    id: font_tiny
+    size: 14
+  - file: "gfonts://Roboto"
+    id: font_small
+    size: 18
+  - file: "gfonts://Roboto"
+    id: font_medium
+    size: 24
+  - file: "gfonts://Roboto"
+    id: font_large
+    size: 60
+
+event:
+  - platform: template
+    id: media_controls
+    name: "${friendly_name} Media Controls"
+    device_class: button
+    event_types:
+      - button_single
+      - button_double
+      - button_long
+      - volume_apply
+      - rotate_left
+      - rotate_right
+      - zone_prev
+      - zone_next
+      - profile_prev
+      - profile_next
+      - source_prev
+      - source_next
+
+script:
+  - id: activate_ui
+    then:
+      - lambda: |-
+          id(ui_last_interaction_ms) = millis();
+      - component.update: round_display
+
+  - id: toggle_screen
+    then:
+      - lambda: |-
+          id(screen_page) = id(screen_page) == 0 ? 1 : 0;
+      - script.execute: activate_ui
+
+  - id: next_config_row
+    then:
+      - lambda: |-
+          id(config_row) = (id(config_row) + 1) % 3;
+      - script.execute: activate_ui
+
+  - id: button_single_press
+    then:
+      - script.execute: activate_ui
+      - event.trigger:
+          id: media_controls
+          event_type: button_single
+
+  - id: button_double_press
+    then:
+      - script.execute: activate_ui
+      - event.trigger:
+          id: media_controls
+          event_type: button_double
+
+  - id: button_long_press
+    then:
+      - script.execute: activate_ui
+      - event.trigger:
+          id: media_controls
+          event_type: button_long
+
+  - id: push_volume_target
+    mode: restart
+    then:
+      - delay: 250ms
+      - event.trigger:
+          id: media_controls
+          event_type: volume_apply
+
+  - id: rotate_left_event
+    then:
+      - script.execute: activate_ui
+      - if:
+          condition:
+            lambda: |-
+              const uint32_t now = millis();
+              if ((now - id(last_rotate_event_ms)) < ${rotate_debounce_ms}) {
+                return false;
+              }
+              id(last_rotate_event_ms) = now;
+              return id(screen_page) == 0;
+          then:
+            - lambda: |-
+                id(volume_sync_hold_until_ms) = millis() + 1200;
+                id(volume_cache) = std::max(-130.0f, id(volume_cache) - id(volume_step_value));
+                char buffer[16];
+                snprintf(buffer, sizeof(buffer), "%.1f dB", id(volume_cache));
+                id(volume_display_value) = std::string(buffer);
+                id(volume_display_text).publish_state(std::string(buffer));
+            - script.execute: push_volume_target
+          else:
+            - if:
+                condition:
+                  lambda: return id(screen_page) == 1 && id(config_row) == 0;
+                then:
+                  - event.trigger:
+                      id: media_controls
+                      event_type: zone_prev
+                else:
+                  - if:
+                      condition:
+                        lambda: return id(screen_page) == 1 && id(config_row) == 1;
+                      then:
+                        - event.trigger:
+                            id: media_controls
+                            event_type: profile_prev
+                      else:
+                        - event.trigger:
+                            id: media_controls
+                            event_type: source_prev
+  - id: rotate_right_event
+    then:
+      - script.execute: activate_ui
+      - if:
+          condition:
+            lambda: |-
+              const uint32_t now = millis();
+              if ((now - id(last_rotate_event_ms)) < ${rotate_debounce_ms}) {
+                return false;
+              }
+              id(last_rotate_event_ms) = now;
+              return id(screen_page) == 0;
+          then:
+            - lambda: |-
+                id(volume_sync_hold_until_ms) = millis() + 1200;
+                id(volume_cache) = std::min(0.0f, id(volume_cache) + id(volume_step_value));
+                char buffer[16];
+                snprintf(buffer, sizeof(buffer), "%.1f dB", id(volume_cache));
+                id(volume_display_value) = std::string(buffer);
+                id(volume_display_text).publish_state(std::string(buffer));
+            - script.execute: push_volume_target
+          else:
+            - if:
+                condition:
+                  lambda: return id(screen_page) == 1 && id(config_row) == 0;
+                then:
+                  - event.trigger:
+                      id: media_controls
+                      event_type: zone_next
+                else:
+                  - if:
+                      condition:
+                        lambda: return id(screen_page) == 1 && id(config_row) == 1;
+                      then:
+                        - event.trigger:
+                            id: media_controls
+                            event_type: profile_next
+                      else:
+                        - event.trigger:
+                            id: media_controls
+                            event_type: source_next
+sensor:
+  - platform: rotary_encoder
+    id: dial_encoder
+    name: "${friendly_name} Dial"
+    pin_a:
+      number: GPIO41
+      mode:
+        input: true
+        pullup: true
+    pin_b:
+      number: GPIO40
+      mode:
+        input: true
+        pullup: true
+    resolution: 2
+    restore_mode: ALWAYS_ZERO
+    entity_category: diagnostic
+    on_clockwise:
+      - script.execute: rotate_left_event
+    on_anticlockwise:
+      - script.execute: rotate_right_event
+
+  - platform: wifi_signal
+    id: wifi_rssi
+    name: "${friendly_name} WiFi Signal"
+    entity_category: diagnostic
+    update_interval: 30s
+
+binary_sensor:
+  - platform: gpio
+    id: front_button
+    name: "${friendly_name} Button"
+    pin:
+      number: GPIO42
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    on_multi_click:
+      - timing:
+          - ON for at most 350ms
+          - OFF for at least 360ms
+        then:
+          - script.execute: button_single_press
+      - timing:
+          - ON for at most 350ms
+          - OFF for at most 350ms
+          - ON for at most 350ms
+          - OFF for at least 360ms
+        then:
+          - script.execute: button_double_press
+      - timing:
+          - ON for at least 700ms
+        then:
+          - script.execute: button_long_press
+
+  - platform: touchscreen
+    id: touch_play_zone
+    internal: true
+    touchscreen_id: dial_touch
+    x_min: 80
+    x_max: 159
+    y_min: 60
+    y_max: 239
+    on_press:
+      - if:
+          condition:
+            lambda: return id(screen_page) == 1;
+          then:
+            - script.execute: next_config_row
+          else:
+            - script.execute: activate_ui
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      id: wifi_ip_address
+      name: "${friendly_name} IP Address"
+      entity_category: diagnostic
+
+  - platform: template
+    id: rtc_clock
+    name: "${friendly_name} RTC Clock"
+    icon: mdi:clock-outline
+    lambda: |-
+      auto now = id(rtc_time).now();
+      if (!now.is_valid()) {
+        return std::string("--:--");
+      }
+      char buffer[6];
+      snprintf(buffer, sizeof(buffer), "%02d:%02d", now.hour, now.minute);
+      return std::string(buffer);
+    update_interval: 30s
+
+  - platform: template
+    id: rtc_date
+    name: "${friendly_name} RTC Date"
+    icon: mdi:calendar
+    lambda: |-
+      auto now = id(rtc_time).now();
+      if (!now.is_valid()) {
+        return std::string("----/--/--");
+      }
+      char buffer[11];
+      snprintf(buffer, sizeof(buffer), "%04d/%02d/%02d", now.year, now.month, now.day_of_month);
+      return std::string(buffer);
+    update_interval: 5min
+
+text:
+  - platform: template
+    id: zone_display_text
+    name: "${friendly_name} Zone Display"
+    optimistic: true
+    restore_value: true
+    initial_value: "-"
+    mode: text
+    set_action:
+      - lambda: |-
+          id(zone_display_value) = x.empty() ? std::string("-") : x;
+      - component.update: round_display
+
+  - platform: template
+    id: profile_display_text
+    name: "${friendly_name} Profile Display"
+    optimistic: true
+    restore_value: true
+    initial_value: "-"
+    mode: text
+    set_action:
+      - lambda: |-
+          id(profile_display_value) = x.empty() ? std::string("-") : x;
+      - component.update: round_display
+
+  - platform: template
+    id: source_display_text
+    name: "${friendly_name} Source Display"
+    optimistic: true
+    restore_value: true
+    initial_value: "-"
+    mode: text
+    set_action:
+      - lambda: |-
+          id(source_display_value) = x.empty() ? std::string("-") : x;
+      - component.update: round_display
+
+  - platform: template
+    id: mute_display_text
+    name: "${friendly_name} Mute Display"
+    optimistic: true
+    restore_value: true
+    initial_value: ""
+    mode: text
+    set_action:
+      - lambda: |-
+          id(mute_display_value) = x;
+      - component.update: round_display
+
+  - platform: template
+    id: power_display_text
+    name: "${friendly_name} Power Display"
+    optimistic: true
+    restore_value: true
+    initial_value: ""
+    mode: text
+    set_action:
+      - lambda: |-
+          id(power_display_value) = x;
+      - component.update: round_display
+
+  - platform: template
+    id: volume_display_text
+    name: "${friendly_name} Volume Display"
+    optimistic: true
+    restore_value: true
+    initial_value: "-20.0 dB"
+    mode: text
+    set_action:
+      - lambda: |-
+          const std::string value = x.empty() ? std::string("-20.0 dB") : x;
+          if (millis() < id(volume_sync_hold_until_ms) && value != id(volume_display_value)) {
+            return;
+          }
+          id(volume_display_value) = value;
+          std::string numeric = value;
+          if (numeric.size() > 3 && numeric.substr(numeric.size() - 3) == " dB") {
+            numeric = numeric.substr(0, numeric.size() - 3);
+          }
+          id(volume_cache) = strtof(numeric.c_str(), nullptr);
+      - component.update: round_display
+
+button:
+  - platform: template
+    name: "${friendly_name} Refresh Display"
+    on_press:
+      - script.execute: activate_ui
+
+  - platform: template
+    name: "${friendly_name} Sync RTC"
+    on_press:
+      - bm8563.write_time:
+          id: rtc_time
+
+  - platform: template
+    name: "${friendly_name} Read RTC"
+    on_press:
+      - bm8563.read_time:
+          id: rtc_time
+
+  - platform: template
+    name: "${friendly_name} Buzzer Test"
+    on_press:
+      - lambda: |-
+          id(buzzer_output).update_frequency(id(buzzer_frequency));
+      - rtttl.play: "two_short:d=4,o=5,b=100:16e6,16e6"
+
+touchscreen:
+  - platform: ft5x06
+    id: dial_touch
+    i2c_id: internal_i2c
+    display: round_display
+    address: 0x38
+    interrupt_pin: GPIO14
+    on_touch:
+      - lambda: |-
+          id(swipe_handled) = false;
+    on_update:
+      - lambda: |-
+          if (id(swipe_handled)) {
+            return;
+          }
+          for (auto touch : touches) {
+            const int dx = touch.x - touch.x_org;
+            const int dy = touch.y - touch.y_org;
+            if (abs(dx) >= ${swipe_threshold_px} && abs(dx) > (abs(dy) * 2)) {
+              id(swipe_handled) = true;
+              id(toggle_screen).execute();
+              break;
+            }
+          }
+    on_release:
+      - lambda: |-
+          id(swipe_handled) = false;
+
+display:
+  - platform: ili9xxx
+    id: round_display
+    model: GC9A01A
+    cs_pin: GPIO7
+    dc_pin: GPIO4
+    reset_pin: GPIO8
+    invert_colors: true
+    dimensions:
+      width: 240
+      height: 240
+    update_interval: 500ms
+    lambda: |-
+      it.fill(Color::BLACK);
+      const bool wifi_connected = !id(wifi_ip_address).state.empty();
+      if (!wifi_connected) {
+        it.printf(120, 78, id(font_medium), Color(110, 210, 255), TextAlign::CENTER, "%s", "Not Connected");
+        it.printf(120, 118, id(font_small), Color(220, 220, 220), TextAlign::CENTER, "%s", "Open HA app");
+        it.printf(120, 146, id(font_small), Color(220, 220, 220), TextAlign::CENTER, "%s", "Add this device");
+        it.printf(120, 174, id(font_small), Color(170, 170, 170), TextAlign::CENTER, "%s", "BLE setup ready");
+        it.printf(120, 220, id(font_small), Color(120, 120, 120), TextAlign::BOTTOM_CENTER, "%s", "Fallback AP ready");
+        return;
+      }
+      const bool dashboard_active = id(ui_last_interaction_ms) != 0 && (millis() - id(ui_last_interaction_ms)) < ${ui_timeout_ms};
+      if (!dashboard_active) {
+        std::string clock = id(rtc_clock).state;
+        std::string date = id(rtc_date).state;
+        std::string zone = id(zone_display_value).empty() ? std::string("-") : id(zone_display_value);
+        std::string profile = id(profile_display_value).empty() ? std::string("-") : id(profile_display_value);
+        std::string source = id(source_display_value).empty() ? std::string("-") : id(source_display_value);
+        if (zone.size() > 18) {
+          zone = zone.substr(0, 18);
+        }
+        if (profile.size() > 18) {
+          profile = profile.substr(0, 18);
+        }
+        if (source.size() > 18) {
+          source = source.substr(0, 18);
+        }
+        const Color accent = Color(110, 210, 255);
+        const Color label = Color(145, 145, 145);
+        const Color value = Color(232, 232, 232);
+
+        auto draw_status_row = [&](int y, const char *name, const std::string &text) {
+          it.printf(34, y, id(font_small), label, TextAlign::TOP_LEFT, "%s", name);
+          it.printf(206, y + 1, id(font_small), value, TextAlign::TOP_RIGHT, "%s", text.c_str());
+        };
+
+        it.printf(120, 16, id(font_medium), Color::WHITE, TextAlign::TOP_CENTER, "%s", clock.c_str());
+        it.printf(120, 42, id(font_small), accent, TextAlign::TOP_CENTER, "%s", date.c_str());
+        it.line(38, 74, 202, 74, Color(55, 55, 55));
+
+        draw_status_row(86, "Zone", zone);
+        draw_status_row(114, "Profile", profile);
+        draw_status_row(142, "Source", source);
+
+        std::string standby_volume = id(volume_display_value);
+        it.line(52, 176, 188, 176, Color(55, 55, 55));
+        it.printf(120, 198, id(font_medium), accent, TextAlign::CENTER, "%s", standby_volume.c_str());
+        return;
+      }
+      if (id(screen_page) == 1) {
+        std::string zone = id(zone_display_value);
+        std::string profile = id(profile_display_value);
+        std::string source = id(source_display_value);
+        if (zone.empty()) {
+          zone = "-";
+        }
+        if (profile.empty()) {
+          profile = "-";
+        }
+        if (source.empty()) {
+          source = "-";
+        }
+        if (zone.size() > 18) {
+          zone = zone.substr(0, 18);
+        }
+        if (profile.size() > 18) {
+          profile = profile.substr(0, 18);
+        }
+        if (source.size() > 18) {
+          source = source.substr(0, 18);
+        }
+        const Color title = Color(150, 190, 220);
+        const Color active_fill = Color(26, 66, 46);
+        const Color active_border = Color(110, 220, 140);
+        const Color active_label = Color::WHITE;
+        const Color active_value = Color(170, 240, 190);
+        const Color idle_fill = Color(18, 18, 18);
+        const Color idle_border = Color(70, 70, 70);
+        const Color idle_label = Color(215, 215, 215);
+        const Color idle_value = Color(145, 145, 145);
+
+        auto draw_row = [&](int row, int y, const char *label, const std::string &text) {
+          const bool selected = id(config_row) == row;
+          const int x = 18;
+          const int w = 204;
+          const int h = 50;
+          it.filled_rectangle(x, y, w, h, selected ? active_fill : idle_fill);
+          it.rectangle(x, y, w, h, selected ? active_border : idle_border);
+          if (selected) {
+            it.filled_rectangle(x + 4, y + 5, 7, h - 10, active_border);
+          }
+          it.printf(x + 16, y + 5, id(font_small), selected ? active_label : idle_label, TextAlign::TOP_LEFT, "%s", label);
+          it.printf(x + w - 16, y + 30, id(font_tiny), selected ? active_value : idle_value, TextAlign::CENTER_RIGHT, "%s", text.c_str());
+        };
+
+        it.printf(120, 14, id(font_small), title, TextAlign::TOP_CENTER, "%s", "Zone / Profile / Source");
+        draw_row(0, 36, "ZONE", zone);
+        draw_row(1, 95, "PROFILE", profile);
+        draw_row(2, 154, "SOURCE", source);
+        return;
+      }
+
+      std::string target = "Media Control";
+      const float volume_ratio = std::max(0.0f, std::min(1.0f, (id(volume_cache) + 130.0f) / 130.0f));
+      const int gauge_steps = 120;
+      const float start_deg = 135.0f;
+      const float sweep_deg = 270.0f;
+      const float radius = 101.0f;
+      const float band_inner = radius - 4.0f;
+      const float band_outer = radius;
+      for (int i = 0; i < gauge_steps; i++) {
+        const float t = float(i) / float(gauge_steps - 1);
+        const float a = (start_deg + t * sweep_deg) * 3.1415926f / 180.0f;
+        const int x1 = int(120 + cosf(a) * band_inner);
+        const int y1 = int(120 + sinf(a) * band_inner);
+        const int x2 = int(120 + cosf(a) * band_outer);
+        const int y2 = int(120 + sinf(a) * band_outer);
+        it.line(x1, y1, x2, y2, Color(235, 235, 235));
+      }
+      const int active_steps = int(volume_ratio * float(gauge_steps - 1));
+      for (int i = 0; i <= active_steps; i++) {
+        const float t = float(i) / float(gauge_steps - 1);
+        const float a = (start_deg + t * sweep_deg) * 3.1415926f / 180.0f;
+        const int x1 = int(120 + cosf(a) * band_inner);
+        const int y1 = int(120 + sinf(a) * band_inner);
+        const int x2 = int(120 + cosf(a) * band_outer);
+        const int y2 = int(120 + sinf(a) * band_outer);
+        it.line(x1, y1, x2, y2, Color(110, 220, 140));
+      }
+      const float end_a = (start_deg + volume_ratio * sweep_deg) * 3.1415926f / 180.0f;
+      it.filled_circle(int(120 + cosf(end_a) * (radius - 2.0f)), int(120 + sinf(end_a) * (radius - 2.0f)), 3, Color(110, 220, 140));
+      it.printf(120, 28, id(font_small), Color(150, 190, 220), TextAlign::TOP_CENTER, "%s", target.c_str());
+      std::string volume_text = id(volume_display_value);
+      if (volume_text.size() > 3 && volume_text.substr(volume_text.size() - 3) == " dB") {
+        volume_text = volume_text.substr(0, volume_text.size() - 3);
+      }
+      it.printf(120, 98, id(font_large), Color::WHITE, TextAlign::CENTER, "%s", volume_text.c_str());
+      it.printf(120, 138, id(font_small), Color(170, 170, 170), TextAlign::CENTER, "%s", "dB");
+      std::string source = "HA blueprint";
+      it.printf(120, 160, id(font_small), Color(150, 190, 220), TextAlign::CENTER, "%s", source.c_str());
+      const Color badge_border = Color(220, 90, 90);
+      const Color badge_fill = Color(56, 12, 12);
+      const Color badge_text = Color(255, 120, 120);
+      if (!id(mute_display_value).empty()) {
+        it.filled_rectangle(26, 176, 84, 28, badge_fill);
+        it.rectangle(26, 176, 84, 28, badge_border);
+        it.printf(68, 190, id(font_tiny), badge_text, TextAlign::CENTER, "%s", id(mute_display_value).c_str());
+      }
+      if (!id(power_display_value).empty()) {
+        it.filled_rectangle(130, 176, 84, 28, badge_fill);
+        it.rectangle(130, 176, 84, 28, badge_border);
+        it.printf(172, 190, id(font_tiny), badge_text, TextAlign::CENTER, "%s", id(power_display_value).c_str());
+      }
+      it.printf(40, 224, id(font_small), Color(120, 120, 120), TextAlign::BOTTOM_CENTER, "-");
+      it.printf(120, 224, id(font_small), Color(120, 120, 120), TextAlign::BOTTOM_CENTER, "o");
+      it.printf(200, 224, id(font_small), Color(120, 120, 120), TextAlign::BOTTOM_CENTER, "+");
