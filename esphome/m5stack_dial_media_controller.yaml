@@ -230,7 +230,12 @@ script:
   - id: activate_ui
     then:
       - lambda: |-
-          id(ui_last_interaction_ms) = millis();
+          const uint32_t now = millis();
+          const bool dashboard_expired = id(ui_last_interaction_ms) == 0 || (now - id(ui_last_interaction_ms)) >= ${ui_timeout_ms};
+          if (dashboard_expired) {
+            id(screen_page) = 0;
+          }
+          id(ui_last_interaction_ms) = now;
       - component.update: round_display
 
   - id: toggle_screen
