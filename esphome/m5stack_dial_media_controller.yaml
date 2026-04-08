@@ -413,19 +413,59 @@ binary_sensor:
           - script.execute: button_long_press
 
   - platform: touchscreen
-    id: touch_play_zone
+    id: touch_select_zone
     internal: true
     touchscreen_id: dial_touch
-    x_min: 80
-    x_max: 159
-    y_min: 60
-    y_max: 239
+    x_min: 18
+    x_max: 222
+    y_min: 36
+    y_max: 86
     on_press:
       - if:
           condition:
             lambda: return id(screen_page) == 1;
           then:
-            - script.execute: next_config_row
+            - lambda: |-
+                id(config_row) = 0;
+            - script.execute: activate_ui
+          else:
+            - script.execute: activate_ui
+
+  - platform: touchscreen
+    id: touch_select_profile
+    internal: true
+    touchscreen_id: dial_touch
+    x_min: 18
+    x_max: 222
+    y_min: 95
+    y_max: 145
+    on_press:
+      - if:
+          condition:
+            lambda: return id(screen_page) == 1;
+          then:
+            - lambda: |-
+                id(config_row) = 1;
+            - script.execute: activate_ui
+          else:
+            - script.execute: activate_ui
+
+  - platform: touchscreen
+    id: touch_select_source
+    internal: true
+    touchscreen_id: dial_touch
+    x_min: 18
+    x_max: 222
+    y_min: 154
+    y_max: 204
+    on_press:
+      - if:
+          condition:
+            lambda: return id(screen_page) == 1;
+          then:
+            - lambda: |-
+                id(config_row) = 2;
+            - script.execute: activate_ui
           else:
             - script.execute: activate_ui
 

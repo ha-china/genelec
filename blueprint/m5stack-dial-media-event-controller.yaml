@@ -321,11 +321,19 @@ variables:
   current_source: >-
     {{ state_attr(current_zone_media, 'source') | default('', true) }}
   current_volume_level: >-
-    {{ state_attr(current_zone_media, 'volume_level') | float((default_volume | float(35)) / 100) }}
+    {{ state_attr(current_zone_media, 'volume_level') }}
   current_volume_db: >-
-    {{ (-130.0 + (current_volume_level | float(0)) * 130.0) | round(1) }}
+    {% if current_volume_level is number %}
+      {{ (-130.0 + (current_volume_level | float(0)) * 130.0) | round(1) }}
+    {% else %}
+      {{ none }}
+    {% endif %}
   current_volume_display: >-
-    {{ '%.1f dB' | format(current_volume_db | float(-20.0)) }}
+    {% if current_volume_db is number %}
+      {{ '%.1f dB' | format(current_volume_db | float(-20.0)) }}
+    {% else %}
+      {{ states(current_volume_text) if current_volume_text is string and current_volume_text != '' else '-20.0 dB' }}
+    {% endif %}
   displayed_volume_db: >-
     {% if current_volume_text is string and current_volume_text != '' %}
       {% set raw = states(current_volume_text) | default('', true) %}
@@ -450,13 +458,21 @@ variables:
   next_zone_source: >-
     {{ state_attr(next_zone_media, 'source') | default('', true) }}
   previous_zone_volume_level: >-
-    {{ state_attr(previous_zone_media, 'volume_level') | float((default_volume | float(35)) / 100) }}
+    {{ state_attr(previous_zone_media, 'volume_level') }}
   next_zone_volume_level: >-
-    {{ state_attr(next_zone_media, 'volume_level') | float((default_volume | float(35)) / 100) }}
+    {{ state_attr(next_zone_media, 'volume_level') }}
   previous_zone_volume_display: >-
-    {{ '%.1f dB' | format((-130.0 + (previous_zone_volume_level | float(0)) * 130.0) | round(1)) }}
+    {% if previous_zone_volume_level is number %}
+      {{ '%.1f dB' | format((-130.0 + (previous_zone_volume_level | float(0)) * 130.0) | round(1)) }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   next_zone_volume_display: >-
-    {{ '%.1f dB' | format((-130.0 + (next_zone_volume_level | float(0)) * 130.0) | round(1)) }}
+    {% if next_zone_volume_level is number %}
+      {{ '%.1f dB' | format((-130.0 + (next_zone_volume_level | float(0)) * 130.0) | round(1)) }}
+    {% else %}
+      {{ '' }}
+    {% endif %}
   previous_zone_is_muted: >-
     {% set muted = state_attr(previous_zone_media, 'is_volume_muted') %}
     {{ muted in [true, 'true', 'True', 'on', 'On'] }}
@@ -597,7 +613,7 @@ actions:
 
   - if:
       - condition: template
-        value_template: "{{ event_type == '' and current_volume_text is string and current_volume_text != '' and states(current_volume_text) != current_volume_display }}"
+        value_template: "{{ event_type == '' and current_volume_level is number and current_volume_text is string and current_volume_text != '' and states(current_volume_text) != current_volume_display }}"
     then:
       - action: text.set_value
         target:
@@ -638,7 +654,7 @@ actions:
   - choose:
       - conditions:
           - condition: template
-            value_template: "{{ event_type == 'volume_apply' and current_volume_text is string and current_volume_text != '' }}"
+            value_template: "{{ event_type == 'volume_apply' and current_volume_level is number and current_volume_text is string and current_volume_text != '' }}"
         sequence:
           - action: media_player.volume_set
             target:
@@ -664,7 +680,7 @@ actions:
                   value: ""
           - if:
               - condition: template
-                value_template: "{{ current_volume_text is string and current_volume_text != '' }}"
+                value_template: "{{ current_volume_text is string and current_volume_text != '' and previous_zone_volume_display != '' }}"
             then:
               - action: text.set_value
                 target:
@@ -690,7 +706,7 @@ actions:
                   value: "OFF"
           - if:
               - condition: template
-                value_template: "{{ current_volume_text is string and current_volume_text != '' }}"
+                value_template: "{{ current_volume_text is string and current_volume_text != '' and next_zone_volume_display != '' }}"
             then:
               - action: text.set_value
                 target:
@@ -809,25 +825,25 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'volume_up' }}"
+            value_template: "{{ selected_action == 'volume_up' and current_volume_level is number }}"
         sequence:
           - action: media_player.volume_set
             target:
               entity_id: "{{ current_zone_media }}"
             data:
               volume_level: >-
-                {{ [1.0, (state_attr(current_zone_media, 'volume_level') | float(0)) + volume_step_level] | min }}
+                {{ [1.0, (current_volume_level | float(0)) + volume_step_level] | min }}
 
       - conditions:
           - condition: template
-            value_template: "{{ selected_action == 'volume_down' }}"
+            value_template: "{{ selected_action == 'volume_down' and current_volume_level is number }}"
         sequence:
           - action: media_player.volume_set
             target:
               entity_id: "{{ current_zone_media }}"
             data:
               volume_level: >-
-                {{ [0.0, (state_attr(current_zone_media, 'volume_level') | float(0)) - volume_step_level] | max }}
+                {{ [0.0, (current_volume_level | float(0)) - volume_step_level] | max }}
 
       - conditions:
           - condition: template
@@ -959,7 +975,7 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ event_type == 'profile_prev' and current_profile_select is string and current_profile_select != '' }}"
+            value_template: "{{ event_type == 'profile_prev' and current_profile_select is string and current_profile_select != '' and current_profile in current_profile_options }}"
         sequence:
           - action: select.select_previous
             target:
@@ -976,7 +992,7 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ event_type == 'profile_next' and current_profile_select is string and current_profile_select != '' }}"
+            value_template: "{{ event_type == 'profile_next' and current_profile_select is string and current_profile_select != '' and current_profile in current_profile_options }}"
         sequence:
           - action: select.select_next
             target:
@@ -993,7 +1009,7 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ event_type == 'source_prev' and current_zone_media is string and current_zone_media != '' and previous_source != '' }}"
+            value_template: "{{ event_type == 'source_prev' and current_zone_media is string and current_zone_media != '' and current_source in current_source_list and previous_source != '' }}"
         sequence:
           - action: media_player.select_source
             target:
@@ -1012,7 +1028,7 @@ actions:
 
       - conditions:
           - condition: template
-            value_template: "{{ event_type == 'source_next' and current_zone_media is string and current_zone_media != '' and next_source != '' }}"
+            value_template: "{{ event_type == 'source_next' and current_zone_media is string and current_zone_media != '' and current_source in current_source_list and next_source != '' }}"
         sequence:
           - action: media_player.select_source
             target:
