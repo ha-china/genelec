@@ -253,6 +253,8 @@ variables:
     {{ zone_media_players if zone_media_players is sequence and zone_media_players is not string else [] }}
   m5_device_id: >-
     {{ device_id(dial_event_entity) | default('', true) if dial_event_entity is string and dial_event_entity != '' else '' }}
+  m5_available: >-
+    {{ dial_event_entity is string and dial_event_entity != '' and states(dial_event_entity) not in ['unknown', 'unavailable'] }}
   current_zone_text: >-
     {% if m5_device_id is string and m5_device_id != '' %}
       {{ device_entities(m5_device_id) | select('match', '^text\..*_zone_display$') | list | first | default('') }}
@@ -571,6 +573,12 @@ variables:
     {% endif %}
 
 actions:
+  - if:
+      - condition: template
+        value_template: "{{ not m5_available }}"
+    then:
+      - stop: M5Stack Dial unavailable
+
   - if:
       - condition: template
         value_template: "{{ current_zone_helper is string and current_zone_helper != '' and configured_zone_media_players | count > 0 and states(current_zone_helper) not in configured_zone_media_players }}"
