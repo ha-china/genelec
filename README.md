@@ -55,6 +55,8 @@ A custom integration for Home Assistant to control Genelec Smart IP series studi
 
 This integration is implemented against `Smart IP API Documentation v1 rev 0.8.4`.
 
+API documentation: [Genelec Smart IP API Documentation (PDF)](https://applicationmarket.crestron.com/content/Help/Genelec/Smart_IP_API_Documentation.pdf)
+
 - `4.6 API version`: `GET /public/{version}/` (with `/device/info` fallback)
 - `4.7 /aoip`: `GET /aoip/dante/identity`, `GET /aoip/ipv4`
 - `4.8 /audio`: `GET/PUT /audio/inputs`, `GET/PUT /audio/volume`
