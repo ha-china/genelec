@@ -375,7 +375,7 @@ sensor:
       mode:
         input: true
         pullup: true
-    resolution: 2
+    resolution: 1
     restore_mode: ALWAYS_ZERO
     entity_category: diagnostic
     on_clockwise:
@@ -421,10 +421,10 @@ binary_sensor:
     id: touch_select_zone
     internal: true
     touchscreen_id: dial_touch
-    x_min: 18
-    x_max: 222
-    y_min: 36
-    y_max: 86
+    x_min: 8
+    x_max: 232
+    y_min: 22
+    y_max: 88
     on_press:
       - if:
           condition:
@@ -440,10 +440,10 @@ binary_sensor:
     id: touch_select_profile
     internal: true
     touchscreen_id: dial_touch
-    x_min: 18
-    x_max: 222
-    y_min: 95
-    y_max: 145
+    x_min: 8
+    x_max: 232
+    y_min: 88
+    y_max: 154
     on_press:
       - if:
           condition:
@@ -459,10 +459,10 @@ binary_sensor:
     id: touch_select_source
     internal: true
     touchscreen_id: dial_touch
-    x_min: 18
-    x_max: 222
+    x_min: 8
+    x_max: 232
     y_min: 154
-    y_max: 204
+    y_max: 220
     on_press:
       - if:
           condition:
@@ -658,6 +658,19 @@ display:
     update_interval: 500ms
     lambda: |-
       it.fill(Color::BLACK);
+      auto marquee_text = [](const std::string &text, size_t visible_chars, uint32_t period_ms) {
+        if (text.empty() || text.size() <= visible_chars) {
+          return text;
+        }
+        const std::string padded = text + "   ";
+        const size_t cycle = padded.size();
+        const size_t offset = (millis() / period_ms) % cycle;
+        std::string window = padded.substr(offset);
+        if (window.size() < visible_chars) {
+          window += padded.substr(0, visible_chars - window.size());
+        }
+        return window.substr(0, visible_chars);
+      };
       const bool wifi_connected = !id(wifi_ip_address).state.empty();
       if (!wifi_connected) {
         it.printf(120, 78, id(font_medium), Color(110, 210, 255), TextAlign::CENTER, "%s", "Not Connected");
@@ -674,22 +687,16 @@ display:
         std::string zone = id(zone_display_value).empty() ? std::string("-") : id(zone_display_value);
         std::string profile = id(profile_display_value).empty() ? std::string("-") : id(profile_display_value);
         std::string source = id(source_display_value).empty() ? std::string("-") : id(source_display_value);
-        if (zone.size() > 18) {
-          zone = zone.substr(0, 18);
-        }
-        if (profile.size() > 18) {
-          profile = profile.substr(0, 18);
-        }
-        if (source.size() > 18) {
-          source = source.substr(0, 18);
-        }
+        zone = marquee_text(zone, 12, 350);
+        profile = marquee_text(profile, 12, 350);
+        source = marquee_text(source, 12, 350);
         const Color accent = Color(110, 210, 255);
         const Color label = Color(145, 145, 145);
         const Color value = Color(232, 232, 232);
 
         auto draw_status_row = [&](int y, const char *name, const std::string &text) {
           it.printf(34, y, id(font_small), label, TextAlign::TOP_LEFT, "%s", name);
-          it.printf(206, y + 1, id(font_small), value, TextAlign::TOP_RIGHT, "%s", text.c_str());
+          it.printf(112, y + 1, id(font_small), value, TextAlign::TOP_LEFT, "%s", text.c_str());
         };
 
         it.printf(120, 16, id(font_medium), Color::WHITE, TextAlign::TOP_CENTER, "%s", clock.c_str());
@@ -727,7 +734,6 @@ display:
         if (source.size() > 18) {
           source = source.substr(0, 18);
         }
-        const Color title = Color(150, 190, 220);
         const Color active_fill = Color(26, 66, 46);
         const Color active_border = Color(110, 220, 140);
         const Color active_label = Color::WHITE;
@@ -739,26 +745,26 @@ display:
 
         auto draw_row = [&](int row, int y, const char *label, const std::string &text) {
           const bool selected = id(config_row) == row;
-          const int x = 18;
-          const int w = 204;
-          const int h = 50;
+          const int x = 16;
+          const int w = 208;
+          const int h = 56;
           it.filled_rectangle(x, y, w, h, selected ? active_fill : idle_fill);
           it.rectangle(x, y, w, h, selected ? active_border : idle_border);
           if (selected) {
             it.filled_rectangle(x + 4, y + 5, 7, h - 10, active_border);
           }
-          it.printf(x + 16, y + 5, id(font_small), selected ? active_label : idle_label, TextAlign::TOP_LEFT, "%s", label);
-          it.printf(x + w - 16, y + 30, id(font_tiny), selected ? active_value : idle_value, TextAlign::CENTER_RIGHT, "%s", text.c_str());
+          it.printf(x + (w / 2), y + 10, id(font_small), selected ? active_label : idle_label, TextAlign::TOP_CENTER, "%s", label);
+          it.printf(x + (w / 2), y + 40, id(font_tiny), selected ? active_value : idle_value, TextAlign::CENTER, "%s", text.c_str());
         };
 
-        it.printf(120, 14, id(font_small), title, TextAlign::TOP_CENTER, "%s", "Zone / Profile / Source");
-        draw_row(0, 36, "ZONE", zone);
-        draw_row(1, 95, "PROFILE", profile);
-        draw_row(2, 154, "SOURCE", source);
+        draw_row(0, 26, "ZONE", zone);
+        draw_row(1, 92, "PROFILE", profile);
+        draw_row(2, 158, "SOURCE", source);
         return;
       }
 
-      std::string target = "Media Control";
+      std::string zone = id(zone_display_value).empty() ? std::string("-") : id(zone_display_value);
+      zone = marquee_text(zone, 16, 400);
       const float volume_ratio = std::max(0.0f, std::min(1.0f, (id(volume_cache) + 130.0f) / 130.0f));
       const int gauge_steps = 120;
       const float start_deg = 135.0f;
@@ -787,15 +793,13 @@ display:
       }
       const float end_a = (start_deg + volume_ratio * sweep_deg) * 3.1415926f / 180.0f;
       it.filled_circle(int(120 + cosf(end_a) * (radius - 2.0f)), int(120 + sinf(end_a) * (radius - 2.0f)), 3, Color(110, 220, 140));
-      it.printf(120, 28, id(font_small), Color(150, 190, 220), TextAlign::TOP_CENTER, "%s", target.c_str());
       std::string volume_text = id(volume_display_value);
       if (volume_text.size() > 3 && volume_text.substr(volume_text.size() - 3) == " dB") {
         volume_text = volume_text.substr(0, volume_text.size() - 3);
       }
       it.printf(120, 98, id(font_large), Color::WHITE, TextAlign::CENTER, "%s", volume_text.c_str());
       it.printf(120, 138, id(font_small), Color(170, 170, 170), TextAlign::CENTER, "%s", "dB");
-      std::string source = "HA blueprint";
-      it.printf(120, 160, id(font_small), Color(150, 190, 220), TextAlign::CENTER, "%s", source.c_str());
+      it.printf(120, 160, id(font_small), Color(150, 190, 220), TextAlign::CENTER, "%s", zone.c_str());
       const Color badge_border = Color(220, 90, 90);
       const Color badge_fill = Color(56, 12, 12);
       const Color badge_text = Color(255, 120, 120);

@@ -94,6 +94,53 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return True
         return False
 
+    async def _sync_hub_device_host(
+        self,
+        unique_id: str | None,
+        host: str | None,
+        port: int | None,
+    ) -> bool:
+        """Update persisted host/port for an already configured device."""
+        hub_entry = self._get_devices_entry()
+        if hub_entry is None:
+            return False
+
+        devices = list(hub_entry.data.get(CONF_DEVICES, []))
+        changed = False
+        matched = False
+
+        for idx, existing in enumerate(devices):
+            if not isinstance(existing, dict):
+                continue
+            if unique_id and existing.get("unique_id") == unique_id:
+                matched = True
+            elif host and existing.get(CONF_HOST) == host:
+                matched = True
+            else:
+                continue
+
+            updated = dict(existing)
+            if host and updated.get(CONF_HOST) != host:
+                updated[CONF_HOST] = host
+                changed = True
+            if port and updated.get(CONF_PORT) != port:
+                updated[CONF_PORT] = port
+                changed = True
+            if changed:
+                devices[idx] = updated
+            break
+
+        if not matched:
+            return False
+
+        if changed:
+            self.hass.config_entries.async_update_entry(
+                hub_entry,
+                data={**hub_entry.data, CONF_DEVICES: devices},
+            )
+            await self.hass.config_entries.async_reload(hub_entry.entry_id)
+        return True
+
     async def _upsert_device_into_hub(self, payload: dict[str, Any]) -> FlowResult:
         hub_entry = self._get_devices_entry()
         unique_id = payload.get("unique_id") or payload.get(CONF_HOST)
@@ -320,6 +367,8 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="no_ip_address")
 
         unique_id = f"genelec_{mac.replace(':', '_')}" if mac else f"genelec_{host}"
+        if await self._sync_hub_device_host(unique_id, host, port):
+            return self.async_abort(reason="already_configured")
         if self._hub_has_device(unique_id, host):
             return self.async_abort(reason="already_configured")
 
