@@ -166,9 +166,22 @@ class GenelecSmartIPDevice:
                     if response.status != 200:
                         error_text = await response.text()
                         if quiet_statuses and response.status in quiet_statuses:
-                            _LOGGER.debug("Request returned %d for %s", response.status, endpoint)
+                            _LOGGER.debug(
+                                "Request returned %d: %s %s (%s)",
+                                response.status,
+                                method,
+                                endpoint,
+                                url,
+                            )
                         else:
-                            _LOGGER.error("Request failed %d: %s", response.status, error_text)
+                            _LOGGER.error(
+                                "Request failed %d: %s %s (%s): %s",
+                                response.status,
+                                method,
+                                endpoint,
+                                url,
+                                error_text,
+                            )
                         raise ClientResponseError(
                             response.request_info,
                             response.history,

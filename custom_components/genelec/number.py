@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from aiohttp import ClientResponseError
+
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -86,6 +88,7 @@ async def async_setup_entry(
 
     if entry_type == ENTRY_TYPE_GROUP:
         zones: dict[int, tuple[str, int]] = _iter_persisted_zones(hass)
+        led_capable_zones: set[int] = set()
         for data_item in _iter_zone_sources(hass):
             zone_info = getattr(data_item, "zone_info", {}) or {}
             if not zone_info and getattr(data_item, "coordinator", None) and data_item.coordinator.data:
@@ -99,10 +102,13 @@ async def async_setup_entry(
             zone_name = str(zone_info.get("name") or f"Zone {zone_id}")
             prev_name, prev_count = zones.get(zone_id, (zone_name, 0))
             zones[zone_id] = (prev_name, prev_count + 1)
+            if getattr(data_item, "led_supported", True):
+                led_capable_zones.add(zone_id)
 
         async_add_entities([
             GenelecZoneLedIntensityNumber(hass, zone_id, zone_name)
             for zone_id, (zone_name, member_count) in sorted(zones.items())
+            if zone_id in led_capable_zones
         ])
         return
 
@@ -110,7 +116,7 @@ async def async_setup_entry(
         entities = [
             GenelecLedIntensityNumber(dev_data.device, dev_data.device_info or {}, dev_data.coordinator)
             for dev_data in data.devices.values()
-            if getattr(dev_data, "device", None)
+            if getattr(dev_data, "device", None) and getattr(dev_data, "led_supported", True)
         ]
         async_add_entities(entities)
         return
@@ -163,7 +169,14 @@ class GenelecLedIntensityNumber(_LedBase, CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         intensity = max(0, min(100, int(value)))
-        await self._device.set_led_settings(led_intensity=intensity)
+        try:
+            await self._device.set_led_settings(led_intensity=intensity)
+        except ClientResponseError as err:
+            if err.status != 404:
+                raise
+            self._attr_available = False
+            self.async_write_ha_state()
+            return
         self._attr_native_value = float(intensity)
 
         if self._coordinator and self._coordinator.data:
@@ -242,7 +255,15 @@ class GenelecZoneLedIntensityNumber(_LedBase, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         intensity = max(0, min(100, int(value)))
         for target in self._zone_targets():
-            await target.device.set_led_settings(led_intensity=intensity)
+            if not getattr(target, "led_supported", True):
+                continue
+            try:
+                await target.device.set_led_settings(led_intensity=intensity)
+            except ClientResponseError as err:
+                if err.status != 404:
+                    raise
+                target.led_supported = False
+                continue
             coordinator = getattr(target, "coordinator", None)
             if coordinator and coordinator.data:
                 updated = dict(coordinator.data)

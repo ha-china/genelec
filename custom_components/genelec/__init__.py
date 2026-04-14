@@ -93,6 +93,7 @@ class GenelecSmartIPData:
         self.device_id: dict = {}
         self.led_data: dict = {}
         self.led_initialized: bool = False  # Track if LED endpoint exists
+        self.led_supported: bool = True
         self.network_config: dict = {}
         self.aoip_ipv4: dict = {}
         self.aoip_identity: dict = {}
@@ -417,10 +418,13 @@ async def async_setup_entry(hass: HomeAssistant,
             if not data.led_initialized:
                 try:
                     data.led_data = await device.get_led_settings()
+                    data.led_supported = True
                     data.led_initialized = True
                     LOGGER.debug("LED data: %s", data.led_data)
                 except Exception as e:
                     LOGGER.debug("LED settings not available: %s", e)
+                    data.led_data = {}
+                    data.led_supported = False
                     data.led_initialized = True  # Mark as checked, even if failed
 
             # These endpoints may not exist on all device models
@@ -1136,8 +1140,10 @@ async def _async_setup_devices_hub_entry(
                     if not target_data.led_initialized:
                         try:
                             target_data.led_data = await target_device.get_led_settings()
+                            target_data.led_supported = True
                         except Exception:
                             target_data.led_data = {}
+                            target_data.led_supported = False
                         finally:
                             target_data.led_initialized = True
 

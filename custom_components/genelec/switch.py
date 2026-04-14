@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any, TYPE_CHECKING
 
+from aiohttp import ClientResponseError
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
@@ -32,6 +33,8 @@ async def async_setup_entry(
         entities: list[SwitchEntity] = []
         for dev_data in data.devices.values():
             if not getattr(dev_data, "device", None):
+                continue
+            if not getattr(dev_data, "led_supported", True):
                 continue
             entities.extend([
                 GenelecRJ45LedsSwitch(dev_data.device, dev_data.device_info or {}, dev_data.coordinator),
@@ -112,14 +115,28 @@ class GenelecRJ45LedsSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self) -> None:
         """Turn the switch on (enable RJ45 LEDs)."""
-        await self._device.set_led_settings(rj45_leds=True)
+        try:
+            await self._device.set_led_settings(rj45_leds=True)
+        except ClientResponseError as err:
+            if err.status != 404:
+                raise
+            self._attr_available = False
+            self.async_write_ha_state()
+            return
         self._rj45_enabled = True
         self._push_led_patch({"rj45Leds": True})
         self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
         """Turn the switch off (disable RJ45 LEDs)."""
-        await self._device.set_led_settings(rj45_leds=False)
+        try:
+            await self._device.set_led_settings(rj45_leds=False)
+        except ClientResponseError as err:
+            if err.status != 404:
+                raise
+            self._attr_available = False
+            self.async_write_ha_state()
+            return
         self._rj45_enabled = False
         self._push_led_patch({"rj45Leds": False})
         self.async_write_ha_state()
@@ -202,14 +219,28 @@ class GenelecClipLedSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self) -> None:
         """Turn the switch on (enable clip LED)."""
-        await self._device.set_led_settings(hide_clip=False)
+        try:
+            await self._device.set_led_settings(hide_clip=False)
+        except ClientResponseError as err:
+            if err.status != 404:
+                raise
+            self._attr_available = False
+            self.async_write_ha_state()
+            return
         self._clip_enabled = True
         self._push_led_patch({"hideClip": False})
         self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
         """Turn the switch off (disable clip LED)."""
-        await self._device.set_led_settings(hide_clip=True)
+        try:
+            await self._device.set_led_settings(hide_clip=True)
+        except ClientResponseError as err:
+            if err.status != 404:
+                raise
+            self._attr_available = False
+            self.async_write_ha_state()
+            return
         self._clip_enabled = False
         self._push_led_patch({"hideClip": True})
         self.async_write_ha_state()
