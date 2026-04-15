@@ -128,6 +128,21 @@ def _update_zone_index(
 ) -> bool:
     """Update global zone index from a device and report change."""
     zone_index = _get_zone_index(hass)
+    changed = False
+
+    for existing_zone_id in list(zone_index):
+        record = dict(zone_index.get(existing_zone_id, {}))
+        members = set(record.get("members", []))
+        if device_unique_id not in members:
+            continue
+        members.remove(device_unique_id)
+        changed = True
+        if members:
+            record["members"] = sorted(members)
+            zone_index[existing_zone_id] = record
+        else:
+            zone_index.pop(existing_zone_id, None)
+
     record = dict(zone_index.get(zone_id, {}))
     members = set(record.get("members", []))
     old_name = str(record.get("name", zone_name))
@@ -136,7 +151,7 @@ def _update_zone_index(
     record["name"] = zone_name
     record["members"] = sorted(members)
     zone_index[zone_id] = record
-    return old_name != zone_name or old_members != members
+    return changed or old_name != zone_name or old_members != members
 
 
 async def _reload_group_entries(hass: HomeAssistant) -> None:

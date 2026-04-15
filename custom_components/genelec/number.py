@@ -21,22 +21,12 @@ from .const import (
     GROUP_HUB_ID,
     SINGLE_HUB_ID,
 )
+from .zone_helpers import get_zone_info, iter_zone_sources, resolve_zone_targets
 
 
 def _iter_zone_sources(hass: HomeAssistant) -> list[Any]:
     """Return all real device data objects for zone aggregation."""
-    sources: list[Any] = []
-    for key, value in hass.data.get(DOMAIN, {}).items():
-        if key.startswith("_"):
-            continue
-        if hasattr(value, "devices"):
-            sources.extend(
-                dev_data for dev_data in value.devices.values() if getattr(dev_data, "device", None)
-            )
-            continue
-        if getattr(value, "device", None):
-            sources.append(value)
-    return sources
+    return iter_zone_sources(hass)
 
 
 def _iter_persisted_zones(hass: HomeAssistant) -> dict[int, tuple[str, int]]:
@@ -90,9 +80,7 @@ async def async_setup_entry(
         zones: dict[int, tuple[str, int]] = _iter_persisted_zones(hass)
         led_capable_zones: set[int] = set()
         for data_item in _iter_zone_sources(hass):
-            zone_info = getattr(data_item, "zone_info", {}) or {}
-            if not zone_info and getattr(data_item, "coordinator", None) and data_item.coordinator.data:
-                zone_info = data_item.coordinator.data.get("zone_info", {}) or {}
+            zone_info = get_zone_info(data_item)
             try:
                 zone_id = int(zone_info.get("zone"))
             except (TypeError, ValueError):
@@ -209,26 +197,7 @@ class GenelecZoneLedIntensityNumber(_LedBase, NumberEntity):
         self._attr_native_value = 100.0
 
     def _zone_targets(self) -> list[Any]:
-        targets: list[Any] = []
-        expected_name = self._zone_name.strip().lower()
-        for key, value in self.hass.data.get(DOMAIN, {}).items():
-            if key.startswith("_"):
-                continue
-            zone_info = getattr(value, "zone_info", {}) or {}
-            if not zone_info:
-                coordinator = getattr(value, "coordinator", None)
-                if coordinator and coordinator.data:
-                    zone_info = coordinator.data.get("zone_info", {}) or {}
-            try:
-                zone_value = int(zone_info.get("zone"))
-            except (TypeError, ValueError):
-                zone_value = None
-            zone_name = str(zone_info.get("name", "")).strip().lower()
-            same_zone = zone_value == self._zone_id
-            same_name = bool(expected_name) and zone_name == expected_name
-            if (same_zone or same_name) and getattr(value, "device", None):
-                targets.append(value)
-        return targets
+        return resolve_zone_targets(self.hass, self._zone_id, self._zone_name)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
