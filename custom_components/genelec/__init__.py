@@ -105,6 +105,7 @@ class GenelecSmartIPData:
         self.poll_tick: int = 0
         self.zone_persisted: bool = False
         self.group_bootstrapped: bool = False
+        self.poll_failures: int = 0
 
 
 class GenelecDevicesHubData:
@@ -396,100 +397,141 @@ async def async_setup_entry(hass: HomeAssistant,
     # Create coordinator for centralized updates
     async def async_update_data():
         """Fetch data from device."""
-        try:
-            data.poll_tick += 1
-            # Fetch all data in sequence to avoid overwhelming the device
-            volume_data = await device.get_volume()
-            power_data = await device.get_power_state()
-            inputs_data = await device.get_inputs()
-            if data.poll_tick % 3 == 0 or not data.events_data:
-                events_data = await device.get_events()
-                data.events_data = events_data
-            else:
-                events_data = data.events_data
+        data.poll_tick += 1
+        host = entry.data.get(CONF_HOST)
+        port = entry.data.get(CONF_PORT, DEFAULT_PORT)
+        poll_had_error = False
 
-            # Update cached data
-            data.volume_data = volume_data
-            data.power_data = power_data
-            data.inputs_data = inputs_data
-            data.events_data = events_data
+        def _coordinator_payload() -> dict[str, Any]:
+            return {
+                "volume": data.volume_data,
+                "power": data.power_data,
+                "inputs": data.inputs_data,
+                "events": data.events_data,
+                "device_info": data.device_info,
+                "device_id": data.device_id,
+                "led": data.led_data,
+                "network_ipv4": data.network_config,
+                "aoip_ipv4": data.aoip_ipv4,
+                "aoip_identity": data.aoip_identity,
+                "zone_info": data.zone_info,
+                "profile_list": data.profile_list,
+                "api_root": data.api_root or {},
+            }
 
-            # Only fetch these once (they don't change often)
-            # These endpoints are required and should work on all devices
-            if not data.device_info:
-                try:
-                    data.device_info = await device.get_device_info()
-                    LOGGER.debug("Device info: %s", data.device_info)
-                except Exception as e:
-                    LOGGER.warning("Failed to get device info: %s", e)
-            if not data.device_id:
-                try:
-                    data.device_id = await device.get_device_id()
-                    LOGGER.debug("Device ID: %s", data.device_id)
-                except Exception as e:
-                    LOGGER.debug("Failed to get device ID: %s", e)
-            
-            # Fetch LED settings once to check if endpoint exists
-            if not data.led_initialized:
-                try:
-                    data.led_data = await device.get_led_settings()
-                    data.led_supported = True
-                    data.led_initialized = True
-                    LOGGER.debug("LED data: %s", data.led_data)
-                except Exception as e:
-                    LOGGER.debug("LED settings not available: %s", e)
-                    data.led_data = {}
-                    data.led_supported = False
-                    data.led_initialized = True  # Mark as checked, even if failed
+        def _log_poll_exception(stage: str, err: Exception, *, optional: bool = False) -> None:
+            nonlocal poll_had_error
+            poll_had_error = True
+            if isinstance(err, aiohttp.ClientResponseError) and err.status == 503:
+                LOGGER.warning(
+                    "Coordinator poll busy for %s:%s during %s: %r",
+                    host,
+                    port,
+                    stage,
+                    err,
+                )
+                return
 
-            # These endpoints may not exist on all device models
-            # 404 errors are expected for devices without these features
-            if data.poll_tick % 2 == 0 or not data.zone_info:
-                try:
-                    latest_zone = await device.get_zone_info()
-                    if isinstance(latest_zone, dict) and latest_zone:
-                        data.zone_info = latest_zone
-                    LOGGER.debug("Zone info: %s", data.zone_info)
-                except Exception as e:
-                    LOGGER.debug("Zone info not available: %s", e)
-                    if not data.zone_info:
-                        data.zone_info = {}
+            log_fn = LOGGER.debug if optional else LOGGER.warning
+            log_fn(
+                "Coordinator poll failed for %s:%s during %s (%s): %r",
+                host,
+                port,
+                stage,
+                type(err).__name__,
+                err,
+            )
 
-            if not data.network_config:
-                try:
-                    data.network_config = await device.get_network_config()
-                    LOGGER.debug("Network config: %s", data.network_config)
-                except Exception as e:
-                    # 404 is expected for devices without network config endpoint
-                    LOGGER.debug("Network config not available: %s", e)
-                    data.network_config = {}  # Set empty dict to prevent repeated attempts
-            if not data.aoip_ipv4:
-                try:
-                    data.aoip_ipv4 = await device.get_aoip_ipv4()
-                    LOGGER.debug("AoIP IPv4: %s", data.aoip_ipv4)
-                except Exception as e:
-                    # 404 is expected for devices without AoIP/Dante module
-                    LOGGER.debug("AoIP IPv4 not available (device may not have Dante): %s", e)
-                    data.aoip_ipv4 = {}  # Set empty dict to prevent repeated attempts
-            if not data.aoip_identity:
-                try:
-                    data.aoip_identity = await device.get_aoip_identity()
-                    LOGGER.debug("AoIP identity: %s", data.aoip_identity)
-                except Exception as e:
-                    # 404 is expected for devices without AoIP/Dante module
-                    LOGGER.debug("AoIP identity not available (device may not have Dante): %s", e)
-                    data.aoip_identity = {}  # Set empty dict to prevent repeated attempts
+        async def _fetch_required(stage: str, method, attr_name: str) -> dict[str, Any]:
+            try:
+                result = await method()
+            except Exception as err:  # pylint: disable=broad-except
+                _log_poll_exception(stage, err)
+                return getattr(data, attr_name)
+            setattr(data, attr_name, result)
+            return result
 
-            if entry_type == ENTRY_TYPE_DEVICE and data.zone_info:
-                    zone_id = data.zone_info.get("zone")
-                    zone_name = str(data.zone_info.get("name", "")).strip()
-                    if isinstance(zone_id, int) and zone_id > 0 and zone_name:
-                        _update_zone_index(hass, data.device_info.get("_device_identifier", device.unique_id), zone_id, zone_name)
-                        zone_changed = False
-                        if entry.data.get(CONF_ZONE_ID) != zone_id or entry.data.get(CONF_ZONE_NAME) != zone_name:
-                            updated_entry_data = dict(entry.data)
-                            updated_entry_data[CONF_ZONE_ID] = zone_id
-                            updated_entry_data[CONF_ZONE_NAME] = zone_name
+        async def _fetch_optional_once(stage: str, method, attr_name: str, empty_value: Any) -> Any:
+            try:
+                result = await method()
+                setattr(data, attr_name, result)
+                return result
+            except Exception as err:  # pylint: disable=broad-except
+                _log_poll_exception(stage, err, optional=True)
+                setattr(data, attr_name, empty_value)
+                return empty_value
+
+        volume_data = await _fetch_required("audio/volume", device.get_volume, "volume_data")
+        power_data = await _fetch_required("device/pwr", device.get_power_state, "power_data")
+        inputs_data = await _fetch_required("audio/inputs", device.get_inputs, "inputs_data")
+        if data.poll_tick % 3 == 0 or not data.events_data:
+            events_data = await _fetch_required("events", device.get_events, "events_data")
+        else:
+            events_data = data.events_data
+
+        if not data.device_info:
+            try:
+                data.device_info = await device.get_device_info()
+                LOGGER.debug("Device info: %s", data.device_info)
+            except Exception as err:  # pylint: disable=broad-except
+                _log_poll_exception("device/info", err, optional=True)
+
+        if not data.device_id:
+            try:
+                data.device_id = await device.get_device_id()
+                LOGGER.debug("Device ID: %s", data.device_id)
+            except Exception as err:  # pylint: disable=broad-except
+                _log_poll_exception("device/id", err, optional=True)
+
+        if not data.led_initialized:
+            try:
+                data.led_data = await device.get_led_settings()
+                data.led_supported = True
+                data.led_initialized = True
+                LOGGER.debug("LED data: %s", data.led_data)
+            except Exception as err:  # pylint: disable=broad-except
+                _log_poll_exception("device/led", err, optional=True)
+                data.led_data = {}
+                data.led_supported = False
+                data.led_initialized = True
+
+        if data.poll_tick % 2 == 0 or not data.zone_info:
+            try:
+                latest_zone = await device.get_zone_info()
+                if isinstance(latest_zone, dict) and latest_zone:
+                    data.zone_info = latest_zone
+                LOGGER.debug("Zone info: %s", data.zone_info)
+            except Exception as err:  # pylint: disable=broad-except
+                _log_poll_exception("network/zone", err, optional=True)
+                if not data.zone_info:
+                    data.zone_info = {}
+
+        if not data.network_config:
+            network = await _fetch_optional_once("network/ipv4", device.get_network_config, "network_config", {})
+            LOGGER.debug("Network config: %s", network)
+        if not data.aoip_ipv4:
+            aoip_ipv4 = await _fetch_optional_once("aoip/ipv4", device.get_aoip_ipv4, "aoip_ipv4", {})
+            LOGGER.debug("AoIP IPv4: %s", aoip_ipv4)
+        if not data.aoip_identity:
+            aoip_identity = await _fetch_optional_once("aoip/identity", device.get_aoip_identity, "aoip_identity", {})
+            LOGGER.debug("AoIP identity: %s", aoip_identity)
+
+        if entry_type == ENTRY_TYPE_DEVICE and data.zone_info:
+            try:
+                zone_id = data.zone_info.get("zone")
+                zone_name = str(data.zone_info.get("name", "")).strip()
+                if isinstance(zone_id, int) and zone_id > 0 and zone_name:
+                    _update_zone_index(
+                        hass,
+                        data.device_info.get("_device_identifier", device.unique_id),
+                        zone_id,
+                        zone_name,
+                    )
+                    zone_changed = False
+                    if entry.data.get(CONF_ZONE_ID) != zone_id or entry.data.get(CONF_ZONE_NAME) != zone_name:
+                        updated_entry_data = dict(entry.data)
+                        updated_entry_data[CONF_ZONE_ID] = zone_id
+                        updated_entry_data[CONF_ZONE_NAME] = zone_name
                         hass.config_entries.async_update_entry(entry, data=updated_entry_data)
                         zone_changed = True
                     data.zone_persisted = True
@@ -498,28 +540,26 @@ async def async_setup_entry(hass: HomeAssistant,
                         for cfg_entry in hass.config_entries.async_entries(DOMAIN):
                             if cfg_entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_GROUP:
                                 await hass.config_entries.async_reload(cfg_entry.entry_id)
+            except Exception as err:  # pylint: disable=broad-except
+                _log_poll_exception("zone persistence", err, optional=True)
 
-            if not data.profile_list:
-                try:
-                    data.profile_list = await device.get_profile_list()
-                    LOGGER.debug("Profile list: %s", data.profile_list)
-                except Exception as e:
-                    LOGGER.debug("Profile list not available: %s", e)
-                    data.profile_list = {}  # Set empty dict to prevent repeated attempts
-            if not data.api_root_checked:
-                try:
-                    data.api_root = await device.get_api_root()
-                    LOGGER.debug("API root payload: %s", data.api_root)
-                except Exception as e:
-                    LOGGER.debug("API root payload not available: %s", e)
-                    data.api_root = None
-                finally:
-                    data.api_root_checked = True
+        if not data.profile_list:
+            profile_list = await _fetch_optional_once("profile/list", device.get_profile_list, "profile_list", {})
+            LOGGER.debug("Profile list: %s", profile_list)
+        if not data.api_root_checked:
+            try:
+                data.api_root = await device.get_api_root()
+                LOGGER.debug("API root payload: %s", data.api_root)
+            except Exception as err:  # pylint: disable=broad-except
+                _log_poll_exception("api root", err, optional=True)
+                data.api_root = None
+            finally:
+                data.api_root_checked = True
 
-            # Auto-bootstrap group hub entry once
-            zone_id = data.zone_info.get("zone")
-            zone_name = str(data.zone_info.get("name", "")).strip()
-            if not data.group_bootstrapped and isinstance(zone_id, int) and zone_id > 0 and zone_name:
+        zone_id = data.zone_info.get("zone")
+        zone_name = str(data.zone_info.get("name", "")).strip()
+        if not data.group_bootstrapped and isinstance(zone_id, int) and zone_id > 0 and zone_name:
+            try:
                 await hass.config_entries.flow.async_init(
                     DOMAIN,
                     context={"source": "import"},
@@ -530,61 +570,15 @@ async def async_setup_entry(hass: HomeAssistant,
                     },
                 )
                 data.group_bootstrapped = True
+            except Exception as err:  # pylint: disable=broad-except
+                _log_poll_exception("group bootstrap", err, optional=True)
 
-            return {
-                "volume": volume_data,
-                "power": power_data,
-                "inputs": inputs_data,
-                "events": events_data,
-                "device_info": data.device_info,
-                "device_id": data.device_id,
-                "led": data.led_data,
-                "network_ipv4": data.network_config,
-                "aoip_ipv4": data.aoip_ipv4,
-                "aoip_identity": data.aoip_identity,
-                "zone_info": data.zone_info,
-                "profile_list": data.profile_list,
-                "api_root": data.api_root or {},
-            }
-        except aiohttp.ClientResponseError as e:
-            if e.status == 503:
-                LOGGER.warning("Device busy (503) while polling %s:%s. Possible extra clients or stale keepalive sessions.", entry.data.get(CONF_HOST), entry.data.get(CONF_PORT, DEFAULT_PORT))
-            else:
-                LOGGER.error("Error updating coordinator data: %s", e)
-            # Return last known data if available
-            return {
-                "volume": data.volume_data,
-                "power": data.power_data,
-                "inputs": data.inputs_data,
-                "events": data.events_data,
-                "device_info": data.device_info,
-                "device_id": data.device_id,
-                "led": data.led_data,
-                "network_ipv4": data.network_config,
-                "aoip_ipv4": data.aoip_ipv4,
-                "aoip_identity": data.aoip_identity,
-                "zone_info": data.zone_info,
-                "profile_list": data.profile_list,
-                "api_root": data.api_root or {},
-            }
-        except Exception as e:
-            LOGGER.error("Error updating coordinator data: %s", e)
-            # Return last known data if available
-            return {
-                "volume": data.volume_data,
-                "power": data.power_data,
-                "inputs": data.inputs_data,
-                "events": data.events_data,
-                "device_info": data.device_info,
-                "device_id": data.device_id,
-                "led": data.led_data,
-                "network_ipv4": data.network_config,
-                "aoip_ipv4": data.aoip_ipv4,
-                "aoip_identity": data.aoip_identity,
-                "zone_info": data.zone_info,
-                "profile_list": data.profile_list,
-                "api_root": data.api_root or {},
-            }
+        if poll_had_error:
+            data.poll_failures += 1
+        else:
+            data.poll_failures = 0
+
+        return _coordinator_payload()
 
     async def handle_get_api_root(call):
         """Handle API root query service (/public/{version}/)."""

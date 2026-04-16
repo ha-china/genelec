@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import Counter
 from typing import Any, TYPE_CHECKING
 
 from aiohttp import ClientResponseError
@@ -49,6 +50,8 @@ from .device import GenelecSmartIPDevice
 from .zone_helpers import iter_zone_sources, resolve_zone_targets
 
 _LOGGER = logging.getLogger(__name__)
+_UNSET = object()
+_VOLUME_DEBOUNCE_SECONDS = 0.2
 
 
 def _iter_zone_sources(hass: HomeAssistant) -> list[Any]:
@@ -228,6 +231,10 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
             INPUT_AOIP_12,
             INPUT_MIX,
         ]
+        self._pending_volume_level: float | object = _UNSET
+        self._pending_volume_mute: bool | object = _UNSET
+        self._volume_flush_task: asyncio.Task | None = None
+        self._volume_change_lock = asyncio.Lock()
 
         # Initialize from coordinator data if available
         if coordinator and coordinator.data:
@@ -314,35 +321,88 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
         level: float | None = None,
         mute: bool | None = None,
     ) -> dict[str, Any]:
-        """Set volume/mute and verify by reading back current state."""
+        """Set volume/mute with optimistic local state and one fallback read."""
         await self._ensure_active()
 
+        desired_level = self._volume if level is None else round(float(level), 1)
+        desired_mute = self._is_muted if mute is None else bool(mute)
+
         await self._device.set_volume(level=level, mute=mute)
-        await asyncio.sleep(0.12)
-        current = await self._device.get_volume()
 
-        level_ok = True
-        if level is not None and isinstance(current.get("level"), (int, float)):
-            level_ok = abs(float(current["level"]) - float(level)) <= 0.2
+        current = {
+            "level": desired_level,
+            "mute": desired_mute,
+        }
+        try:
+            verified = await self._device.get_volume()
+        except Exception as err:  # pylint: disable=broad-except
+            _LOGGER.debug("Volume readback skipped after write for %s: %r", self._device.unique_id, err)
+            return current
 
-        mute_ok = True
-        if mute is not None and isinstance(current.get("mute"), bool):
-            mute_ok = bool(current["mute"]) == bool(mute)
-
-        if not (level_ok and mute_ok):
-            await self._device.set_volume(level=level, mute=mute)
-            await asyncio.sleep(0.12)
-            current = await self._device.get_volume()
+        if isinstance(verified.get("level"), (int, float)):
+            current["level"] = float(verified["level"])
+        if isinstance(verified.get("mute"), bool):
+            current["mute"] = bool(verified["mute"])
 
         if level is not None and isinstance(current.get("level"), (int, float)):
             if abs(float(current["level"]) - float(level)) > 0.2:
                 fallback_level = max(-130.0, min(0.0, float(level)))
                 if abs(fallback_level - float(level)) > 0.05:
                     await self._device.set_volume(level=fallback_level, mute=mute)
-                    await asyncio.sleep(0.12)
-                    current = await self._device.get_volume()
+                    current["level"] = round(fallback_level, 1)
+                    if mute is not None:
+                        current["mute"] = bool(mute)
 
         return current
+
+    async def _flush_volume_change(self) -> None:
+        """Apply the latest queued volume change after a short debounce."""
+        await asyncio.sleep(_VOLUME_DEBOUNCE_SECONDS)
+        while True:
+            async with self._volume_change_lock:
+                level = None if self._pending_volume_level is _UNSET else float(self._pending_volume_level)
+                mute = None if self._pending_volume_mute is _UNSET else bool(self._pending_volume_mute)
+                self._pending_volume_level = _UNSET
+                self._pending_volume_mute = _UNSET
+
+            current = await self._set_volume_with_verify(level=level, mute=mute)
+            if isinstance(current.get("level"), (int, float)):
+                self._volume = float(current["level"])
+            if isinstance(current.get("mute"), bool):
+                self._is_muted = bool(current["mute"])
+            self._push_coordinator_patch({"volume": {"level": self._volume, "mute": self._is_muted}})
+            self.async_write_ha_state()
+
+            if self._pending_volume_level is _UNSET and self._pending_volume_mute is _UNSET:
+                self._volume_flush_task = None
+                return
+
+            await asyncio.sleep(_VOLUME_DEBOUNCE_SECONDS)
+
+    async def _queue_volume_change(
+        self,
+        *,
+        level: float | object = _UNSET,
+        mute: bool | object = _UNSET,
+    ) -> None:
+        """Coalesce rapid volume updates so only the latest value is written."""
+        async with self._volume_change_lock:
+            if level is not _UNSET:
+                target_level = round(float(level), 1)
+                current_level = self._volume if self._pending_volume_level is _UNSET else float(self._pending_volume_level)
+                if abs(current_level - target_level) >= 0.1:
+                    self._pending_volume_level = target_level
+            if mute is not _UNSET:
+                self._pending_volume_mute = bool(mute)
+
+            if self._pending_volume_level is _UNSET and self._pending_volume_mute is _UNSET:
+                return
+
+            if self._volume_flush_task is None or self._volume_flush_task.done():
+                self._volume_flush_task = asyncio.create_task(self._flush_volume_change())
+            task = self._volume_flush_task
+
+        await task
 
     async def _set_inputs_with_verify(self, api_sources: list[str]) -> list[str]:
         """Set input sources and verify by reading back current inputs."""
@@ -496,37 +556,22 @@ class GenelecSmartIPMediaPlayer(MediaPlayerEntity):
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute or unmute media player."""
-        current = await self._set_volume_with_verify(mute=mute)
-        self._is_muted = bool(current.get("mute", mute))
-        self._push_coordinator_patch({"volume": {"mute": self._is_muted}})
-        self.async_write_ha_state()
+        await self._queue_volume_change(mute=mute)
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level, range 0..1."""
         level = MIN_VOLUME_DB + (max(0.0, min(1.0, volume)) * (MAX_VOLUME_DB - MIN_VOLUME_DB))
-        current = await self._set_volume_with_verify(level=level)
-        applied_level = float(current.get("level", level))
-        self._volume = applied_level
-        self._push_coordinator_patch({"volume": {"level": applied_level}})
-        self.async_write_ha_state()
+        await self._queue_volume_change(level=level)
 
     async def async_volume_up(self) -> None:
         """Volume up the media player."""
         new_level = min(0, self._volume + 1.0)
-        current = await self._set_volume_with_verify(level=new_level)
-        applied_level = float(current.get("level", new_level))
-        self._volume = applied_level
-        self._push_coordinator_patch({"volume": {"level": applied_level}})
-        self.async_write_ha_state()
+        await self._queue_volume_change(level=new_level)
 
     async def async_volume_down(self) -> None:
         """Volume down the media player."""
         new_level = max(MIN_VOLUME_DB, self._volume - 1.0)
-        current = await self._set_volume_with_verify(level=new_level)
-        applied_level = float(current.get("level", new_level))
-        self._volume = applied_level
-        self._push_coordinator_patch({"volume": {"level": applied_level}})
-        self.async_write_ha_state()
+        await self._queue_volume_change(level=new_level)
 
     async def async_turn_on(self) -> None:
         """Turn the media player on."""
@@ -685,6 +730,48 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
             updated[key] = merged
         coordinator.async_set_updated_data(updated)
 
+    def _target_host(self, target: Any) -> str:
+        device = getattr(target, "device", None)
+        if not device:
+            return "unknown"
+        return getattr(device, "_host", getattr(device, "host", "unknown"))
+
+    async def _set_target_mute_precise(self, target: Any, mute: bool) -> tuple[bool, bool]:
+        """Update one target mute state without affecting other zone members."""
+        await target.device.set_volume(mute=mute)
+        try:
+            current = await target.device.get_volume()
+        except Exception:
+            return True, mute
+
+        applied_mute = current.get("mute")
+        if isinstance(applied_mute, bool):
+            return True, applied_mute
+        return True, mute
+
+    async def _set_target_level_precise(self, target: Any, level: float) -> tuple[bool, float]:
+        """Update one target level with a light readback for better accuracy."""
+        await self._wake_target_if_needed(target)
+        await target.device.set_volume(level=level)
+
+        try:
+            current = await target.device.get_volume()
+        except Exception:
+            return True, level
+
+        applied_level = current.get("level")
+        if isinstance(applied_level, (int, float)):
+            applied_level = float(applied_level)
+            if abs(applied_level - float(level)) <= 0.2:
+                return True, applied_level
+
+        fallback_level = max(-130.0, min(0.0, float(level)))
+        if abs(fallback_level - float(level)) > 0.05:
+            await target.device.set_volume(level=fallback_level)
+            return True, round(fallback_level, 1)
+
+        return True, level
+
     async def _first_zone_multicast_endpoint(self, targets: list[Any]) -> tuple[str, int] | None:
         """Return the first usable multicast endpoint from zone members."""
         for target in targets:
@@ -726,20 +813,36 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
             return
 
         self._attr_available = True
-        sample = targets[0]
-        payload = sample.coordinator.data if sample.coordinator and sample.coordinator.data else {}
-        volume_data = payload.get("volume", {})
-        power_data = payload.get("power", {})
-
-        self._volume = volume_data.get("level", self._volume)
-        self._is_muted = volume_data.get("mute", self._is_muted)
-        self._power_state = power_data.get("state", self._power_state)
-
         target_sources = []
+        volume_levels: list[float] = []
+        mute_states: list[bool] = []
+        power_states: list[str] = []
         for target in targets:
             target_payload = target.coordinator.data if target.coordinator and target.coordinator.data else {}
+            volume_data = target_payload.get("volume", {})
+            power_data = target_payload.get("power", {})
+
+            level = volume_data.get("level")
+            if isinstance(level, (int, float)):
+                volume_levels.append(round(float(level), 1))
+
+            mute = volume_data.get("mute")
+            if isinstance(mute, bool):
+                mute_states.append(bool(mute))
+
+            state = power_data.get("state")
+            if isinstance(state, str) and state:
+                power_states.append(state)
+
             target_inputs = tuple(_normalize_api_inputs(target_payload.get("inputs", {})))
             target_sources.append(target_inputs)
+
+        if volume_levels:
+            self._volume = Counter(volume_levels).most_common(1)[0][0]
+        if mute_states:
+            self._is_muted = Counter(mute_states).most_common(1)[0][0]
+        if power_states:
+            self._power_state = Counter(power_states).most_common(1)[0][0]
 
         unique_sources = {sources for sources in target_sources}
         if not unique_sources:
@@ -856,24 +959,33 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         if endpoint is not None:
             vol_ip, vol_port = endpoint
             await targets[0].device.send_multicast({"mute": mute}, vol_ip, vol_port)
+            successful_updates = len(targets)
         else:
             results = await asyncio.gather(
-                *(target.device.set_volume(mute=mute) for target in targets),
+                *(self._set_target_mute_precise(target, mute) for target in targets),
                 return_exceptions=True,
             )
+            successful_updates = 0
             for target, result in zip(targets, results, strict=False):
                 if isinstance(result, Exception):
                     _LOGGER.warning(
                         "Zone '%s' mute update failed for %s: %s",
                         self._zone_name,
-                        getattr(target.device, "host", "unknown"),
+                        self._target_host(target),
                         result,
                     )
-        for target in targets:
-            self._patch_target(target, {"volume": {"mute": mute}})
+                    continue
+                _, applied_mute = result
+                self._patch_target(target, {"volume": {"mute": applied_mute}})
+                successful_updates += 1
 
-        self._is_muted = mute
-        self.async_write_ha_state()
+        if endpoint is not None:
+            for target in targets:
+                self._patch_target(target, {"volume": {"mute": mute}})
+
+        if successful_updates:
+            self._is_muted = mute
+            self.async_write_ha_state()
 
     async def async_set_volume_level(self, volume: float) -> None:
         level = MIN_VOLUME_DB + (max(0.0, min(1.0, volume)) * (MAX_VOLUME_DB - MIN_VOLUME_DB))
@@ -885,28 +997,33 @@ class GenelecZoneMediaPlayer(MediaPlayerEntity):
         if endpoint is not None:
             vol_ip, vol_port = endpoint
             await targets[0].device.send_multicast({"level": max(-130.0, min(0.0, level))}, vol_ip, vol_port)
+            successful_updates = len(targets)
         else:
-            async def _set_target_level(target: Any) -> None:
-                await self._wake_target_if_needed(target)
-                await target.device.set_volume(level=level)
-
             results = await asyncio.gather(
-                *(_set_target_level(target) for target in targets),
+                *(self._set_target_level_precise(target, level) for target in targets),
                 return_exceptions=True,
             )
+            successful_updates = 0
             for target, result in zip(targets, results, strict=False):
                 if isinstance(result, Exception):
                     _LOGGER.warning(
                         "Zone '%s' volume update failed for %s: %s",
                         self._zone_name,
-                        getattr(target.device, "host", "unknown"),
+                        self._target_host(target),
                         result,
                     )
-        for target in targets:
-            self._patch_target(target, {"volume": {"level": level}})
+                    continue
+                _, applied_level = result
+                self._patch_target(target, {"volume": {"level": applied_level}})
+                successful_updates += 1
 
-        self._volume = level
-        self.async_write_ha_state()
+        if endpoint is not None:
+            for target in targets:
+                self._patch_target(target, {"volume": {"level": level}})
+
+        if successful_updates:
+            self._volume = round(float(level), 1)
+            self.async_write_ha_state()
 
     async def async_turn_on(self) -> None:
         targets = self._zone_targets()
