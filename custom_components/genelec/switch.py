@@ -61,10 +61,11 @@ class GenelecRJ45LedsSwitch(CoordinatorEntity, SwitchEntity):
         self._device = device
         self._device_info = device_info
         self._coordinator = coordinator
+        stable_id = device_info.get("_device_identifier", device.unique_id)
         self._attr_name = "RJ45 LEDs"
-        self._attr_unique_id = f"{device.unique_id}_rj45_leds"
+        self._attr_unique_id = f"{stable_id}_rj45_leds"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, device_info.get("_device_identifier", device.unique_id))},
+            "identifiers": {(DOMAIN, stable_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",
@@ -162,10 +163,11 @@ class GenelecClipLedSwitch(CoordinatorEntity, SwitchEntity):
         self._device = device
         self._device_info = device_info
         self._coordinator = coordinator
+        stable_id = device_info.get("_device_identifier", device.unique_id)
         self._attr_name = "Clip LED"
-        self._attr_unique_id = f"{device.unique_id}_clip_led"
+        self._attr_unique_id = f"{stable_id}_clip_led"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, device_info.get("_device_identifier", device.unique_id))},
+            "identifiers": {(DOMAIN, stable_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",

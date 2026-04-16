@@ -130,10 +130,11 @@ class GenelecLedIntensityNumber(_LedBase, CoordinatorEntity, NumberEntity):
         super().__init__(coordinator)
         self._device = device
         self._coordinator = coordinator
+        stable_id = device_info.get("_device_identifier", device.unique_id)
         self._attr_name = "LED Intensity"
-        self._attr_unique_id = f"{device.unique_id}_led_intensity"
+        self._attr_unique_id = f"{stable_id}_led_intensity"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, device_info.get("_device_identifier", device.unique_id))},
+            "identifiers": {(DOMAIN, stable_id)},
             "name": device_info.get("_device_name", "Genelec Device"),
             "manufacturer": "Genelec",
             "model": "Smart IP",
