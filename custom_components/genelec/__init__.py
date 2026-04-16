@@ -145,14 +145,17 @@ def _update_zone_index(
 
     zone_index = _get_zone_index(hass)
     changed = False
+    previous_zone_id: int | None = None
 
     for existing_zone_id in list(zone_index):
         record = dict(zone_index.get(existing_zone_id, {}))
         members = set(record.get("members", []))
         if device_unique_id not in members:
             continue
+        previous_zone_id = existing_zone_id
         members.remove(device_unique_id)
-        changed = True
+        if existing_zone_id != zone_id:
+            changed = True
         if members:
             record["members"] = sorted(members)
             zone_index[existing_zone_id] = record
@@ -166,6 +169,8 @@ def _update_zone_index(
     record["name"] = _select_zone_name(record.get("name", ""), zone_name)
     record["members"] = sorted(members)
     zone_index[zone_id] = record
+    if previous_zone_id == zone_id:
+        return changed
     return changed or old_members != members
 
 
