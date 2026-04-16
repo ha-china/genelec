@@ -128,6 +128,21 @@ def _update_zone_index(
     zone_name: str,
 ) -> bool:
     """Update global zone index from a device and report change."""
+    def _select_zone_name(current_name: str, candidate_name: str) -> str:
+        current = str(current_name).strip()
+        candidate = str(candidate_name).strip()
+        placeholder = f"Zone {zone_id}"
+
+        if not candidate:
+            return current
+        if not current or current == placeholder:
+            return candidate
+        if candidate == placeholder:
+            return current
+        if len(candidate) > len(current) + 1:
+            return candidate
+        return current
+
     zone_index = _get_zone_index(hass)
     changed = False
 
@@ -146,13 +161,12 @@ def _update_zone_index(
 
     record = dict(zone_index.get(zone_id, {}))
     members = set(record.get("members", []))
-    old_name = str(record.get("name", zone_name))
     old_members = set(members)
     members.add(device_unique_id)
-    record["name"] = zone_name
+    record["name"] = _select_zone_name(record.get("name", ""), zone_name)
     record["members"] = sorted(members)
     zone_index[zone_id] = record
-    return changed or old_name != zone_name or old_members != members
+    return changed or old_members != members
 
 
 async def _reload_group_entries(hass: HomeAssistant) -> None:
@@ -198,6 +212,23 @@ def _update_persisted_device_zone(
             data={**entry.data, CONF_DEVICES: devices},
         )
     return changed
+
+
+def _select_entry_zone_name(existing_name: str, candidate_name: str, zone_id: int) -> str:
+    """Keep a stable entry-level zone name when devices disagree."""
+    existing = str(existing_name).strip()
+    candidate = str(candidate_name).strip()
+    placeholder = f"Zone {zone_id}"
+
+    if not candidate:
+        return existing
+    if not existing or existing == placeholder:
+        return candidate
+    if candidate == placeholder:
+        return existing
+    if len(candidate) > len(existing) + 1:
+        return candidate
+    return existing
 
 
 async def _ensure_group_entry_exists(
@@ -521,22 +552,25 @@ async def async_setup_entry(hass: HomeAssistant,
                 zone_id = data.zone_info.get("zone")
                 zone_name = str(data.zone_info.get("name", "")).strip()
                 if isinstance(zone_id, int) and zone_id > 0 and zone_name:
-                    _update_zone_index(
+                    zone_topology_changed = _update_zone_index(
                         hass,
                         data.device_info.get("_device_identifier", device.unique_id),
                         zone_id,
                         zone_name,
                     )
+                    current_entry_zone_id = entry.data.get(CONF_ZONE_ID)
+                    current_entry_zone_name = str(entry.data.get(CONF_ZONE_NAME, "")).strip()
+                    resolved_zone_name = _select_entry_zone_name(current_entry_zone_name, zone_name, zone_id)
                     zone_changed = False
-                    if entry.data.get(CONF_ZONE_ID) != zone_id or entry.data.get(CONF_ZONE_NAME) != zone_name:
+                    if current_entry_zone_id != zone_id or current_entry_zone_name != resolved_zone_name:
                         updated_entry_data = dict(entry.data)
                         updated_entry_data[CONF_ZONE_ID] = zone_id
-                        updated_entry_data[CONF_ZONE_NAME] = zone_name
+                        updated_entry_data[CONF_ZONE_NAME] = resolved_zone_name
                         hass.config_entries.async_update_entry(entry, data=updated_entry_data)
-                        zone_changed = True
+                        zone_changed = current_entry_zone_id != zone_id
                     data.zone_persisted = True
 
-                    if zone_changed:
+                    if zone_topology_changed or zone_changed:
                         for cfg_entry in hass.config_entries.async_entries(DOMAIN):
                             if cfg_entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_GROUP:
                                 await hass.config_entries.async_reload(cfg_entry.entry_id)
@@ -1051,7 +1085,7 @@ async def _async_setup_devices_hub_entry(
                 early_zone_id,
                 early_zone_name,
             )
-            zone_data_changed[0] = zone_data_changed[0] or zone_index_changed or zone_changed
+            zone_data_changed[0] = zone_data_changed[0] or zone_index_changed
             if not data.group_bootstrapped:
                 await hass.config_entries.flow.async_init(
                     DOMAIN,
@@ -1059,11 +1093,11 @@ async def _async_setup_devices_hub_entry(
                     data={
                         CONF_ENTRY_TYPE: ENTRY_TYPE_GROUP,
                         CONF_ZONE_ID: early_zone_id,
-                        CONF_ZONE_NAME: early_zone_name,
+                        CONF_ZONE_NAME: _select_entry_zone_name("", early_zone_name, early_zone_id),
                     },
                 )
                 data.group_bootstrapped = True
-            elif zone_changed:
+            elif zone_index_changed:
                 await _reload_group_entries(hass)
 
         async def _make_update(target_data: GenelecSmartIPData, target_device: GenelecSmartIPDevice):
@@ -1135,11 +1169,11 @@ async def _async_setup_devices_hub_entry(
                             data={
                                 CONF_ENTRY_TYPE: ENTRY_TYPE_GROUP,
                                 CONF_ZONE_ID: zone_id,
-                                CONF_ZONE_NAME: zone_name,
+                                CONF_ZONE_NAME: _select_entry_zone_name("", zone_name, zone_id),
                             },
                         )
                         target_data.group_bootstrapped = True
-                    elif zone_changed or zone_index_changed:
+                    elif zone_index_changed:
                         await _reload_group_entries(hass)
                     if not target_data.profile_list:
                         try:
