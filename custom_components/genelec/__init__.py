@@ -174,6 +174,27 @@ def _update_zone_index(
     return changed or old_members != members
 
 
+def _remove_from_zone_index(hass: HomeAssistant, device_unique_id: str) -> bool:
+    """Remove a device from the global zone index and report change."""
+    zone_index = _get_zone_index(hass)
+    changed = False
+
+    for existing_zone_id in list(zone_index):
+        record = dict(zone_index.get(existing_zone_id, {}))
+        members = set(record.get("members", []))
+        if device_unique_id not in members:
+            continue
+        members.remove(device_unique_id)
+        changed = True
+        if members:
+            record["members"] = sorted(members)
+            zone_index[existing_zone_id] = record
+        else:
+            zone_index.pop(existing_zone_id, None)
+
+    return changed
+
+
 async def _reload_group_entries(hass: HomeAssistant) -> None:
     """Reload all Genelec Zone entries."""
     for cfg_entry in hass.config_entries.async_entries(DOMAIN):
@@ -191,23 +212,32 @@ def _update_persisted_device_zone(
     hass: HomeAssistant,
     entry: GenelecSmartIPConfigEntry,
     device_unique_id: str,
-    zone_id: int,
+    zone_id: int | None,
     zone_name: str,
 ) -> bool:
     """Persist per-device zone info into the Genelec Devices entry."""
     devices = _get_persisted_devices(entry)
     changed = False
+    valid_zone = isinstance(zone_id, int) and zone_id > 0 and bool(zone_name)
     for idx, device_payload in enumerate(devices):
         if not isinstance(device_payload, dict):
             continue
         payload_unique_id = device_payload.get("unique_id") or device_payload.get(CONF_HOST)
         if payload_unique_id != device_unique_id:
             continue
-        if device_payload.get(CONF_ZONE_ID) == zone_id and device_payload.get(CONF_ZONE_NAME) == zone_name:
+        current_zone_id = device_payload.get(CONF_ZONE_ID)
+        current_zone_name = device_payload.get(CONF_ZONE_NAME)
+        if valid_zone and current_zone_id == zone_id and current_zone_name == zone_name:
+            return False
+        if not valid_zone and CONF_ZONE_ID not in device_payload and CONF_ZONE_NAME not in device_payload:
             return False
         updated = dict(device_payload)
-        updated[CONF_ZONE_ID] = zone_id
-        updated[CONF_ZONE_NAME] = zone_name
+        if valid_zone:
+            updated[CONF_ZONE_ID] = zone_id
+            updated[CONF_ZONE_NAME] = zone_name
+        else:
+            updated.pop(CONF_ZONE_ID, None)
+            updated.pop(CONF_ZONE_NAME, None)
         devices[idx] = updated
         changed = True
         break
@@ -406,6 +436,8 @@ async def async_setup_entry(hass: HomeAssistant,
             manufacturer="Genelec",
             model=(data.device_info or {}).get(ATTR_MODEL, "Smart IP"),
         )
+        if speaker_device.name != device_display_name:
+            dev_reg.async_update_device(speaker_device.id, name=device_display_name)
         if speaker_device.via_device_id != hub_device.id:
             dev_reg.async_update_device(speaker_device.id, via_device_id=hub_device.id)
 
@@ -534,7 +566,7 @@ async def async_setup_entry(hass: HomeAssistant,
         if data.poll_tick % 2 == 0 or not data.zone_info:
             try:
                 latest_zone = await device.get_zone_info()
-                if isinstance(latest_zone, dict) and latest_zone:
+                if isinstance(latest_zone, dict):
                     data.zone_info = latest_zone
                 LOGGER.debug("Zone info: %s", data.zone_info)
             except Exception as err:  # pylint: disable=broad-except
@@ -552,7 +584,7 @@ async def async_setup_entry(hass: HomeAssistant,
             aoip_identity = await _fetch_optional_once("aoip/identity", device.get_aoip_identity, "aoip_identity", {})
             LOGGER.debug("AoIP identity: %s", aoip_identity)
 
-        if entry_type == ENTRY_TYPE_DEVICE and data.zone_info:
+        if entry_type == ENTRY_TYPE_DEVICE:
             try:
                 zone_id = data.zone_info.get("zone")
                 zone_name = str(data.zone_info.get("name", "")).strip()
@@ -575,6 +607,20 @@ async def async_setup_entry(hass: HomeAssistant,
                         zone_changed = current_entry_zone_id != zone_id
                     data.zone_persisted = True
 
+                    if zone_topology_changed or zone_changed:
+                        for cfg_entry in hass.config_entries.async_entries(DOMAIN):
+                            if cfg_entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_GROUP:
+                                await hass.config_entries.async_reload(cfg_entry.entry_id)
+                else:
+                    device_identifier = data.device_info.get("_device_identifier", device.unique_id)
+                    zone_topology_changed = _remove_from_zone_index(hass, device_identifier)
+                    zone_changed = _update_persisted_device_zone(
+                        hass,
+                        entry,
+                        device_identifier,
+                        None,
+                        "",
+                    )
                     if zone_topology_changed or zone_changed:
                         for cfg_entry in hass.config_entries.async_entries(DOMAIN):
                             if cfg_entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_GROUP:
@@ -1076,6 +1122,8 @@ async def _async_setup_devices_hub_entry(
             manufacturer="Genelec",
             model=(data.device_info or {}).get(ATTR_MODEL, "Smart IP"),
         )
+        if speaker_device.name != device_display_name:
+            dev_reg.async_update_device(speaker_device.id, name=device_display_name)
         if speaker_device.via_device_id is not None:
             dev_reg.async_update_device(speaker_device.id, via_device_id=None)
 
@@ -1126,7 +1174,7 @@ async def _async_setup_devices_hub_entry(
                     if target_data.poll_tick % 2 == 0 or not target_data.zone_info:
                         try:
                             latest_zone = await target_device.get_zone_info()
-                            if isinstance(latest_zone, dict) and latest_zone:
+                            if isinstance(latest_zone, dict):
                                 target_data.zone_info = latest_zone
                         except Exception:
                             if not target_data.zone_info:
@@ -1160,7 +1208,14 @@ async def _async_setup_devices_hub_entry(
                             zone_name,
                         )
                     else:
-                        zone_changed = False
+                        zone_index_changed = _remove_from_zone_index(hass, device_unique_id)
+                        zone_changed = _update_persisted_device_zone(
+                            hass,
+                            entry,
+                            device_unique_id,
+                            None,
+                            "",
+                        )
 
                     if (
                         not target_data.group_bootstrapped

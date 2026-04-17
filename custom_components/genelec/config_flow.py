@@ -94,6 +94,17 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return True
         return False
 
+    def _format_device_name(self, display_name: str | None, host: str) -> str:
+        """Keep the persisted display name in `<name> [<host>]` form."""
+        base_name = str(display_name or "").strip()
+        if base_name.endswith("]") and " [" in base_name:
+            prefix, _, suffix = base_name.rpartition(" [")
+            if prefix and suffix[:-1]:
+                base_name = prefix.strip()
+        if not base_name:
+            base_name = host
+        return f"{base_name} [{host}]"
+
     async def _sync_hub_device_host(
         self,
         unique_id: str | None,
@@ -126,6 +137,11 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if port and updated.get(CONF_PORT) != port:
                 updated[CONF_PORT] = port
                 changed = True
+            if host:
+                updated_name = self._format_device_name(updated.get(CONF_DEVICE_NAME), host)
+                if updated.get(CONF_DEVICE_NAME) != updated_name:
+                    updated[CONF_DEVICE_NAME] = updated_name
+                    changed = True
             if changed:
                 devices[idx] = updated
             break
@@ -263,7 +279,7 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             pass
 
                         payload = dict(user_input)
-                        payload[CONF_DEVICE_NAME] = f"{device_name} [{user_input[CONF_HOST]}]"
+                        payload[CONF_DEVICE_NAME] = self._format_device_name(device_name, user_input[CONF_HOST])
                         payload["unique_id"] = device.unique_id
                         return await self._upsert_device_into_hub(payload)
                     else:
@@ -435,7 +451,7 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             CONF_USERNAME: user_input.get(CONF_USERNAME, DEFAULT_USERNAME),
                             CONF_PASSWORD: user_input.get(CONF_PASSWORD, DEFAULT_PASSWORD),
                             CONF_API_VERSION: DEFAULT_API_VERSION,
-                            CONF_DEVICE_NAME: f"{device_name} [{device_info[CONF_HOST]}]",
+                            CONF_DEVICE_NAME: self._format_device_name(device_name, device_info[CONF_HOST]),
                             "unique_id": device.unique_id,
                         }
                         return await self._upsert_device_into_hub(data)
