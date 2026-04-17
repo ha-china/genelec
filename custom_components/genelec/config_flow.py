@@ -95,21 +95,64 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return False
 
     def _format_device_name(self, display_name: str | None, host: str) -> str:
-        """Keep the persisted display name in `<name> [<host>]` form."""
+        """Return a stable display name without embedding connection info."""
         base_name = str(display_name or "").strip()
-        if base_name.endswith("]") and " [" in base_name:
-            prefix, _, suffix = base_name.rpartition(" [")
-            if prefix and suffix[:-1]:
-                base_name = prefix.strip()
         if not base_name:
             base_name = host
-        return f"{base_name} [{host}]"
+        return base_name
+
+    async def _refresh_discovered_device_name(
+        self,
+        payload: dict[str, Any],
+        host: str | None,
+        port: int | None,
+        fallback_name: str | None = None,
+    ) -> str:
+        """Resolve the latest display name for a discovered existing device."""
+        resolved_host = str(host or payload.get(CONF_HOST) or "").strip()
+        if not resolved_host:
+            return self._format_device_name(payload.get(CONF_DEVICE_NAME), fallback_name or "")
+
+        resolved_port = int(port or payload.get(CONF_PORT, DEFAULT_PORT))
+        normalized_fallback = self._format_device_name(
+            payload.get(CONF_DEVICE_NAME),
+            fallback_name or resolved_host,
+        )
+
+        try:
+            import aiohttp
+
+            async with aiohttp.ClientSession() as session:
+                lock = asyncio.Lock()
+                device = GenelecSmartIPDevice(
+                    host=resolved_host,
+                    port=resolved_port,
+                    username=payload.get(CONF_USERNAME, DEFAULT_USERNAME),
+                    password=payload.get(CONF_PASSWORD, DEFAULT_PASSWORD),
+                    api_version=payload.get(CONF_API_VERSION, DEFAULT_API_VERSION),
+                    session=session,
+                    lock=lock,
+                )
+                if await device.test_connection():
+                    latest_name = await self._resolve_device_name(
+                        device,
+                        fallback_name=normalized_fallback,
+                        host=resolved_host,
+                    )
+                    return self._format_device_name(latest_name, resolved_host)
+        except Exception:
+            _LOGGER.debug("Failed to refresh discovered device name for %s", resolved_host, exc_info=True)
+
+        if isinstance(fallback_name, str) and fallback_name.strip():
+            return self._format_device_name(fallback_name, resolved_host)
+        return normalized_fallback
 
     async def _sync_hub_device_host(
         self,
         unique_id: str | None,
         host: str | None,
         port: int | None,
+        fallback_name: str | None = None,
     ) -> bool:
         """Update persisted host/port for an already configured device."""
         hub_entry = self._get_devices_entry()
@@ -137,11 +180,15 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if port and updated.get(CONF_PORT) != port:
                 updated[CONF_PORT] = port
                 changed = True
-            if host:
-                updated_name = self._format_device_name(updated.get(CONF_DEVICE_NAME), host)
-                if updated.get(CONF_DEVICE_NAME) != updated_name:
-                    updated[CONF_DEVICE_NAME] = updated_name
-                    changed = True
+            normalized_name = await self._refresh_discovered_device_name(
+                updated,
+                host,
+                port,
+                fallback_name,
+            )
+            if updated.get(CONF_DEVICE_NAME) != normalized_name:
+                updated[CONF_DEVICE_NAME] = normalized_name
+                changed = True
             if changed:
                 devices[idx] = updated
             break
@@ -383,7 +430,7 @@ class GenelecSmartIPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="no_ip_address")
 
         unique_id = f"genelec_{mac.replace(':', '_')}" if mac else f"genelec_{host}"
-        if await self._sync_hub_device_host(unique_id, host, port):
+        if await self._sync_hub_device_host(unique_id, host, port, name):
             return self.async_abort(reason="already_configured")
         if self._hub_has_device(unique_id, host):
             return self.async_abort(reason="already_configured")

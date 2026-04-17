@@ -115,6 +115,12 @@ class GenelecDevicesHubData:
         self.devices: dict[str, GenelecSmartIPData] = {}
 
 
+def _normalize_device_display_name(raw_name: str | None, fallback_name: str) -> str:
+    """Return the stored display name or a fallback."""
+    display_name = str(raw_name or "").strip()
+    return display_name or fallback_name
+
+
 def _get_zone_index(hass: HomeAssistant) -> dict[int, dict[str, Any]]:
     """Return mutable global zone index."""
     hass.data.setdefault(DOMAIN, {})
@@ -393,7 +399,10 @@ async def async_setup_entry(hass: HomeAssistant,
     # Fetch device_info early
     try:
         device_info_data = await device.get_device_info()
-        device_display_name = entry.data.get(CONF_DEVICE_NAME) or entry.title or device.name
+        device_display_name = _normalize_device_display_name(
+            entry.data.get(CONF_DEVICE_NAME),
+            entry.title or device.name,
+        )
         device_info_data["_device_name"] = device_display_name
         data.device_info = device_info_data
         device._device_info = device_info_data
@@ -403,7 +412,12 @@ async def async_setup_entry(hass: HomeAssistant,
     # Stable identifier shared between entities and device registry.
     # Prefer entry.unique_id (MAC-based) when available.
     if not data.device_info:
-        data.device_info = {"_device_name": entry.data.get(CONF_DEVICE_NAME) or entry.title or device.name}
+        data.device_info = {
+            "_device_name": _normalize_device_display_name(
+                entry.data.get(CONF_DEVICE_NAME),
+                entry.title or device.name,
+            )
+        }
     data.device_info["_device_identifier"] = entry.unique_id or device.unique_id
 
     # Fetch zone early so Genelec Zone can appear without waiting for a full poll cycle.
@@ -1096,7 +1110,10 @@ async def _async_setup_devices_hub_entry(
         except Exception as e:
             LOGGER.warning("Failed to get device_id during hub setup: %s", e)
 
-        device_display_name = device_cfg.get(CONF_DEVICE_NAME) or device_cfg.get(CONF_HOST) or device.name
+        device_display_name = _normalize_device_display_name(
+            device_cfg.get(CONF_DEVICE_NAME),
+            str(device_cfg.get(CONF_HOST) or device.name),
+        )
         try:
             device_info_data = await device.get_device_info()
             device_info_data["_device_name"] = device_display_name
