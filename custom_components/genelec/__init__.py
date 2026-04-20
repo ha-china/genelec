@@ -1172,6 +1172,8 @@ async def _async_setup_devices_hub_entry(
 
         async def _make_update(target_data: GenelecSmartIPData, target_device: GenelecSmartIPDevice):
             async def async_update_data() -> dict[str, Any]:
+                target_host = getattr(target_device, "_host", device_cfg.get(CONF_HOST, "unknown"))
+                target_port = getattr(target_device, "_port", device_cfg.get(CONF_PORT, DEFAULT_PORT))
                 try:
                     target_data.poll_tick += 1
                     volume_data = await target_device.get_volume()
@@ -1267,6 +1269,15 @@ async def _async_setup_devices_hub_entry(
                         finally:
                             target_data.led_initialized = True
 
+                    if target_data.poll_failures:
+                        LOGGER.info(
+                            "Coordinator poll recovered for %s:%s after %s failures",
+                            target_host,
+                            target_port,
+                            target_data.poll_failures,
+                        )
+                        target_data.poll_failures = 0
+
                     return {
                         "volume": volume_data,
                         "power": power_data,
@@ -1282,7 +1293,15 @@ async def _async_setup_devices_hub_entry(
                         "profile_list": target_data.profile_list,
                     }
                 except Exception as e:
-                    LOGGER.error("Error updating coordinator data: %s", e)
+                    target_data.poll_failures += 1
+                    log_fn = LOGGER.warning if target_data.poll_failures == 1 else LOGGER.debug
+                    log_fn(
+                        "Coordinator poll failed for %s:%s (%s): %r",
+                        target_host,
+                        target_port,
+                        type(e).__name__,
+                        e,
+                    )
                     return {
                         "volume": target_data.volume_data,
                         "power": target_data.power_data,
