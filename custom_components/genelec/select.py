@@ -430,13 +430,17 @@ class GenelecZoneProfileSelect(SelectEntity):
         }
 
     def _patch_target_profile(self, target: Any, profile_id: int) -> None:
+        profile = dict(getattr(target, "profile_list", {}) or {})
+        profile["selected"] = profile_id
+        target.profile_list = profile
+
         coordinator = getattr(target, "coordinator", None)
         if not coordinator or not coordinator.data:
             return
         updated = dict(coordinator.data)
-        profile = dict(updated.get(SENSOR_KEYS_PROFILE, {}))
-        profile["selected"] = profile_id
-        updated[SENSOR_KEYS_PROFILE] = profile
+        coordinator_profile = dict(updated.get(SENSOR_KEYS_PROFILE, {}))
+        coordinator_profile.update(profile)
+        updated[SENSOR_KEYS_PROFILE] = coordinator_profile
         coordinator.async_set_updated_data(updated)
 
     @staticmethod
