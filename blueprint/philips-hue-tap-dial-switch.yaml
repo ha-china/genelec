@@ -599,7 +599,12 @@ actions:
           value: "{{ button_num }}"
       - if:
           - condition: template
-            value_template: "{{ selected_media is string and selected_media != '' and selected_default_volume_enabled | bool(false) }}"
+            value_template: >-
+              {{
+                selected_media is string
+                and selected_media != ''
+                and selected_default_volume_enabled in [true, 'true', 'True', 'on', 'On']
+              }}
         then:
           - action: media_player.volume_set
             target:
