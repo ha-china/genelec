@@ -68,6 +68,20 @@ blueprint:
             - domain:
                 - input_text
           multiple: false
+    last_hold:
+      name: Last Hold Dedup Helper
+      description: |
+        `required` `entity`
+
+        Create a unique input_text helper for each dial to deduplicate hold events.
+        When ZHA sends repeated hold events during a long press, only the first one
+        triggers the action. Must be a different helper from Last Pressed.
+      selector:
+        entity:
+          filter:
+            - domain:
+                - input_text
+          multiple: false
     rotate_volume_step:
       name: Rotate Volume Step
       description: Volume step used for volume up/down rotary mode.
@@ -410,6 +424,7 @@ triggers:
 
 variables:
   last_pressed: !input last_pressed
+  last_hold: !input last_hold
   rotate_volume_step: !input rotate_volume_step
   zha_command: "{{ trigger.event.data.command if trigger.event is defined else '' }}"
   command: "{{ zha_command }}"
@@ -590,6 +605,29 @@ variables:
 actions:
   - if:
       - condition: template
+        value_template: "{{ command is string and '_hold' in command and last_hold is string and last_hold != '' and states(last_hold) == button_num }}"
+    then:
+      - stop: Duplicate hold event, already processed
+  - if:
+      - condition: template
+        value_template: "{{ command is string and '_hold' in command }}"
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: !input last_hold
+        data:
+          value: "{{ button_num }}"
+  - if:
+      - condition: template
+        value_template: "{{ command is string and '_hold' not in command and command | regex_search('button_[1-4]') }}"
+    then:
+      - action: input_text.set_value
+        target:
+          entity_id: !input last_hold
+        data:
+          value: ""
+  - if:
+      - condition: template
         value_template: "{{ command | regex_search('button_[1-4]') }}"
     then:
       - action: input_text.set_value
@@ -656,18 +694,9 @@ actions:
                 - condition: template
                   value_template: "{{ repeat.item == 'toggle_power' and selected_media is string and selected_media != '' }}"
               sequence:
-                - choose:
-                    - conditions:
-                        - condition: template
-                          value_template: "{{ states(selected_media) in ['off', 'standby', 'unavailable', 'unknown'] }}"
-                      sequence:
-                        - action: media_player.turn_on
-                          target:
-                            entity_id: "{{ selected_media }}"
-                  default:
-                    - action: media_player.turn_off
-                      target:
-                        entity_id: "{{ selected_media }}"
+                - action: media_player.toggle
+                  target:
+                    entity_id: "{{ selected_media }}"
 
             - conditions:
                 - condition: template
