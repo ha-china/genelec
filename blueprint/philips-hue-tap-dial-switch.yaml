@@ -399,7 +399,7 @@ blueprint:
               options: *rotate_mode_options
               multiple: false
 
-mode: restart
+mode: single
 
 triggers:
   - trigger: event
