@@ -414,6 +414,7 @@ blueprint:
               multiple: false
 
 mode: single
+max_exceeded: silent
 
 triggers:
   - trigger: event
