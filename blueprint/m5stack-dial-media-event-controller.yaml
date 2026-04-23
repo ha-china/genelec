@@ -677,6 +677,13 @@ actions:
           - action: media_player.turn_on
             target:
               entity_id: "{{ current_zone_media }}"
+          - delay:
+              milliseconds: 300
+          - action: media_player.volume_set
+            target:
+              entity_id: "{{ current_zone_media }}"
+            data:
+              volume_level: "{{ (default_volume | float(35)) / 100 }}"
           - if:
               - condition: template
                 value_template: "{{ current_power_text is string and current_power_text != '' }}"
@@ -764,9 +771,25 @@ actions:
           - condition: template
             value_template: "{{ selected_action == 'toggle_power' }}"
         sequence:
-          - action: media_player.toggle
-            target:
-              entity_id: "{{ current_zone_media }}"
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_power_state in ['off', 'standby', 'unavailable', 'unknown'] }}"
+                sequence:
+                  - action: media_player.turn_on
+                    target:
+                      entity_id: "{{ current_zone_media }}"
+                  - delay:
+                      milliseconds: 300
+                  - action: media_player.volume_set
+                    target:
+                      entity_id: "{{ current_zone_media }}"
+                    data:
+                      volume_level: "{{ (default_volume | float(35)) / 100 }}"
+              default:
+                - action: media_player.turn_off
+                  target:
+                    entity_id: "{{ current_zone_media }}"
           - if:
               - condition: template
                 value_template: "{{ current_power_text is string and current_power_text != '' }}"

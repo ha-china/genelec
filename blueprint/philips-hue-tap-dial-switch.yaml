@@ -609,6 +609,17 @@ actions:
                 - action: media_player.turn_on
                   target:
                     entity_id: "{{ selected_media }}"
+                - if:
+                    - condition: template
+                      value_template: "{{ selected_default_volume_enabled | bool(false) }}"
+                  then:
+                    - delay:
+                        milliseconds: 300
+                    - action: media_player.volume_set
+                      target:
+                        entity_id: "{{ selected_media }}"
+                      data:
+                        volume_level: "{{ (selected_default_volume | float(35)) / 100 }}"
 
             - conditions:
                 - condition: template
@@ -642,9 +653,29 @@ actions:
                 - condition: template
                   value_template: "{{ repeat.item == 'toggle_power' and selected_media is string and selected_media != '' }}"
               sequence:
-                - action: media_player.toggle
-                  target:
-                    entity_id: "{{ selected_media }}"
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ states(selected_media) in ['off', 'standby', 'unavailable', 'unknown'] }}"
+                      sequence:
+                        - action: media_player.turn_on
+                          target:
+                            entity_id: "{{ selected_media }}"
+                        - if:
+                            - condition: template
+                              value_template: "{{ selected_default_volume_enabled | bool(false) }}"
+                          then:
+                            - delay:
+                                milliseconds: 300
+                            - action: media_player.volume_set
+                              target:
+                                entity_id: "{{ selected_media }}"
+                              data:
+                                volume_level: "{{ (selected_default_volume | float(35)) / 100 }}"
+                  default:
+                    - action: media_player.turn_off
+                      target:
+                        entity_id: "{{ selected_media }}"
 
             - conditions:
                 - condition: template
